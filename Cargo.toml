@@ -1,0 +1,23 @@
+[package]
+name = "BA-AD-Core"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+name = "baad"
+path = "src/lib.rs"
+
+[features]
+default = []
+no_logs = []
+no_debug = []
+no_error = []
+
+[dependencies]
+paris = { version = "1.5.15", features = ["timestamps", "macros"] }
+anyhow = "1.0.98"
+glob = "0.3.2"
+serde_json = "1.0.140"
+walkdir = "2.5.0"
+zip = "4.2.0"
+reqwest = "0.12.20"
