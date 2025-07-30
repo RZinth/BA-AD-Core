@@ -1,6 +1,6 @@
-mod config;
+pub mod config;
 mod error;
-mod file;
+pub mod file;
 pub mod formatter;
 mod utils;
 
