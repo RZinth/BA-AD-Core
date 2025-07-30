@@ -1,5 +1,9 @@
+use crate::log_error_chain;
+
+use anyhow::Result;
 use lazy_regex::regex;
-use tracing::Level;
+use std::future::Future;
+use tracing::{error, Level};
 
 pub fn contains_url(value: &str) -> bool {
     regex!(r"https?://[^\s]+|ftp://[^\s]+").is_match(value)
@@ -60,5 +64,37 @@ pub fn get_level_visual_length(level: &Level, is_success: bool) -> usize {
     match *level {
         Level::ERROR | Level::DEBUG | Level::TRACE => 7,
         Level::WARN | Level::INFO => 6,
+    }
+}
+
+
+pub fn run<F>(f: F)
+where
+    F: FnOnce() -> Result<()>
+{
+    if let Err(e) = crate::config::init_logging_default() {
+        error!("Failed to initialize logging: {}", e);
+        std::process::exit(1);
+    }
+
+    if let Err(e) = f() {
+        log_error_chain(&e);
+        std::process::exit(1);
+    }
+}
+
+pub async fn run_async<F, Fut>(f: F)
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<()>>,
+{
+    if let Err(e) = crate::config::init_logging_default() {
+        error!("Failed to initialize logging: {}", e);
+        std::process::exit(1);
+    }
+
+    if let Err(e) = f().await {
+        log_error_chain(&e);
+        std::process::exit(1);
     }
 }

@@ -28,7 +28,6 @@ impl Default for ErrorConfig {
     }
 }
 
-#[derive(Clone)]
 pub struct ErrorLogger {
     config: Arc<ErrorConfig>,
 }
