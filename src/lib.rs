@@ -1,6 +1,6 @@
-pub mod config;
-pub mod error;
-pub mod file;
+mod config;
+mod error;
+mod file;
 pub mod formatter;
 mod utils;
 
@@ -14,6 +14,3 @@ pub use file::{
 };
 pub use utils::{run, run_async};
 pub use tracing::{debug, error, info, trace, warn};
-
-// Re-export for convenience
-pub type Result<T> = anyhow::Result<T>;
