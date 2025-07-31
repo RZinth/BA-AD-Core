@@ -72,7 +72,7 @@ pub fn run<F>(f: F)
 where
     F: FnOnce() -> Result<()>
 {
-    if let Err(e) = crate::config::init_logging_default() {
+    if let Err(e) = crate::config::init_logging_from_env() {
         error!("Failed to initialize logging: {}", e);
         std::process::exit(1);
     }
@@ -88,7 +88,7 @@ where
     F: FnOnce() -> Fut,
     Fut: Future<Output = Result<()>>,
 {
-    if let Err(e) = crate::config::init_logging_default() {
+    if let Err(e) = crate::config::init_logging_from_env() {
         error!("Failed to initialize logging: {}", e);
         std::process::exit(1);
     }

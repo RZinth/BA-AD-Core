@@ -1,0 +1,97 @@
+[Error]
+enum Error {
+    "Generic",
+};
+
+dictionary LoggingConfig {
+    boolean enable_console;
+    boolean enable_json;
+    boolean enable_debug;
+    boolean verbose_mode;
+    boolean colored_output;
+    boolean include_timestamps;
+};
+
+dictionary FeatureConfig {
+    boolean logs_enabled;
+    boolean debug_enabled;
+    boolean error_enabled;
+};
+
+namespace baad_core {
+
+    [Throws=Error]
+    void init_logging(LoggingConfig config);
+
+    [Throws=Error]
+    void init_logging_default();
+
+    [Throws=Error]
+    void init_logging_from_env();
+
+    FeatureConfig get_feature_config();
+
+    [Throws=Error]
+    void set_app_name(string name);
+
+    [Throws=Error]
+    void set_data_dir(string path);
+
+    [Throws=Error]
+    string data_dir();
+
+    [Throws=Error]
+    string get_data_path(string filename);
+
+    [Throws=Error]
+    bytes load_file(string path);
+
+    [Throws=Error]
+    void save_file(string path, bytes content);
+
+    [Throws=Error]
+    void create_parent_dir(string path);
+
+    [Throws=Error]
+    string get_output_dir(string? path);
+
+    [Throws=Error]
+    boolean is_dir_empty(string path);
+
+    [Throws=Error]
+    void clear_all(string dir);
+
+    void log_error_from_string(string error_message);
+
+    void log_recoverable_error_from_string(string error_message, string recovery_action);
+
+    void log_info(string message);
+
+    void log_error(string message);
+
+    void log_warn(string message);
+
+    void log_debug(string message);
+
+    void log_trace(string message);
+
+    void log_info_with_field(string message, string field_name, string field_value);
+
+    void log_error_with_field(string message, string field_name, string field_value);
+
+    void log_warn_with_field(string message, string field_name, string field_value);
+
+    void log_debug_with_field(string message, string field_name, string field_value);
+
+    void log_trace_with_field(string message, string field_name, string field_value);
+
+    void log_info_with_fields(string message, record<string, string> fields);
+
+    void log_error_with_fields(string message, record<string, string> fields);
+
+    void log_warn_with_fields(string message, record<string, string> fields);
+
+    void log_debug_with_fields(string message, record<string, string> fields);
+
+    void log_trace_with_fields(string message, record<string, string> fields);
+};

@@ -1,0 +1,20 @@
+[bindings.python]
+cdylib_name = "baad_core"
+
+[bindings.kotlin]
+cdylib_name = "baad_core"
+package_name = "baad_core"
+
+[bindings.swift]
+cdylib_name = "baad_core"
+
+[bindings.ruby]
+cdylib_name = "baad_core"
+
+[bindings.csharp]
+cdylib_name = "baad_core"
+namespace = "BAAD.Core"
+
+[bindings.go]
+cdylib_name = "baad_core"
+package_name = "baad_core"

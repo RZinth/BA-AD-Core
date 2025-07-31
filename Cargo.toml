@@ -1,9 +1,14 @@
 [package]
 name = "baad-core"
-version = "1.0.5"
+version = "2.1.0"
 edition = "2024"
 
+[[bin]]
+name = "bindgen"
+path = "bindgen.rs"
+
 [lib]
+crate-type = ["cdylib"]
 name = "baad_core"
 path = "src/lib.rs"
 
@@ -22,5 +27,10 @@ chrono = { version = "0.4", features = ["serde"] }
 lazy-regex = "3.3"
 once_cell = "1.19"
 smallvec = "1.13"
+thiserror = "2.0"
 tokio = { version = "1.47.0", features = ["full"] }
 platform-dirs = "0.3.0"
+uniffi = { version = "0.29.3", features = ["cli"] }
+
+[build-dependencies]
+uniffi = { version = "0.29.3", features = [ "build" ] }
