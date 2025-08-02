@@ -1,6 +1,6 @@
 [package]
 name = "baad-core"
-version = "2.1.0"
+version = "2.1.1"
 edition = "2024"
 
 [[bin]]
@@ -8,7 +8,7 @@ name = "bindgen"
 path = "bindgen.rs"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 name = "baad_core"
 path = "src/lib.rs"
 
