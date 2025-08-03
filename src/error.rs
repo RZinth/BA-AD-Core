@@ -50,6 +50,15 @@ impl From<anyhow::Error> for LoggingError {
     }
 }
 
+impl LoggingError {
+    pub fn from_any<E>(err: E) -> Self
+    where
+        E: Into<anyhow::Error>
+    {
+        Self::new(err.into())
+    }
+}
+
 impl From<std::io::Error> for LoggingError {
     fn from(err: std::io::Error) -> Self {
         Self::new(anyhow::Error::from(err))
@@ -66,6 +75,17 @@ impl From<&str> for LoggingError {
     fn from(err: &str) -> Self {
         Self::new(anyhow::Error::msg(err.to_string()))
     }
+}
+
+#[macro_export]
+macro_rules! impl_logging_error_from {
+    ($error_type:ty) => {
+        impl From<$error_type> for $crate::error::LoggingError {
+            fn from(err: $error_type) -> Self {
+                Self::new(anyhow::Error::from(err))
+            }
+        }
+    };
 }
 
 #[derive(Debug, Clone)]
