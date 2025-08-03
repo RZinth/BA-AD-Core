@@ -8,7 +8,7 @@ mod bindings;
 
 pub use tracing::{debug, error, info, trace, warn};
 
-pub use error::{log_error_chain, log_recoverable_error, LogError};
+pub use error::{log_error_chain, log_recoverable_error, LogError, Result};
 pub use utils::{run, run_async};
 
 pub use bindings::*;
