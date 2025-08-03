@@ -58,7 +58,7 @@ pub fn init_logging(config: LoggingConfig) -> Result<()> {
         return Ok(());
     }
 
-    let env_filter = match (config.verbose_mode, feature_config.debug_enabled) {
+    let env_filter = match (config.verbose_mode, config.enable_debug && feature_config.debug_enabled) {
         (true, _) => EnvFilter::new("trace"),
         (false, true) => EnvFilter::new("debug"),
         (false, false) => EnvFilter::new("info"),
