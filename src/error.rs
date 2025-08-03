@@ -12,14 +12,14 @@ use tracing::warn;
 #[cfg(not(feature = "no_error"))]
 use tracing::error;
 
-pub type Result<T> = std::result::Result<T, AutoLoggingError>;
+pub type Result<T> = std::result::Result<T, LoggingError>;
 
 #[derive(Debug)]
-pub struct AutoLoggingError {
+pub struct LoggingError {
     inner: anyhow::Error,
 }
 
-impl AutoLoggingError {
+impl LoggingError {
     pub fn new(error: anyhow::Error) -> Self {
         #[cfg(not(feature = "no_error"))]
         log_error_chain(&error);
@@ -32,37 +32,37 @@ impl AutoLoggingError {
     }
 }
 
-impl std::fmt::Display for AutoLoggingError {
+impl std::fmt::Display for LoggingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.inner.fmt(f)
     }
 }
 
-impl std::error::Error for AutoLoggingError {
+impl std::error::Error for LoggingError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.inner.source()
     }
 }
 
-impl From<anyhow::Error> for AutoLoggingError {
+impl From<anyhow::Error> for LoggingError {
     fn from(error: anyhow::Error) -> Self {
         Self::new(error)
     }
 }
 
-impl From<std::io::Error> for AutoLoggingError {
+impl From<std::io::Error> for LoggingError {
     fn from(err: std::io::Error) -> Self {
         Self::new(anyhow::Error::from(err))
     }
 }
 
-impl From<String> for AutoLoggingError {
+impl From<String> for LoggingError {
     fn from(err: String) -> Self {
         Self::new(anyhow::Error::msg(err))
     }
 }
 
-impl From<&str> for AutoLoggingError {
+impl From<&str> for LoggingError {
     fn from(err: &str) -> Self {
         Self::new(anyhow::Error::msg(err.to_string()))
     }
@@ -242,14 +242,14 @@ macro_rules! log_and_bail {
         {
             let error = anyhow::anyhow!($msg);
             $crate::error::log_error_chain(&error);
-            return Err($crate::error::AutoLoggingError::from(error));
+            return Err($crate::error::LoggingError::from(error));
         }
     };
     ($fmt:expr, $($arg:tt)*) => {
         {
             let error = anyhow::anyhow!($fmt, $($arg)*);
             $crate::error::log_error_chain(&error);
-            return Err($crate::error::AutoLoggingError::from(error));
+            return Err($crate::error::LoggingError::from(error));
         }
     };
 }
@@ -262,7 +262,7 @@ macro_rules! try_with_log {
             Err(e) => {
                 let anyhow_error = anyhow::Error::from(e);
                 $crate::error::log_error_chain(&anyhow_error);
-                return Err($crate::error::AutoLoggingError::from(anyhow_error));
+                return Err($crate::error::LoggingError::from(anyhow_error));
             }
         }
     };
@@ -273,7 +273,7 @@ macro_rules! try_with_log {
                 use anyhow::Context;
                 let anyhow_error = anyhow::Error::from(e).context($context);
                 $crate::error::log_error_chain(&anyhow_error);
-                return Err($crate::error::AutoLoggingError::from(anyhow_error));
+                return Err($crate::error::LoggingError::from(anyhow_error));
             }
         }
     };
@@ -285,14 +285,14 @@ macro_rules! error_and_log {
         {
             let error = anyhow::anyhow!($msg);
             $crate::error::log_error_chain(&error);
-            $crate::error::AutoLoggingError::from(error)
+            $crate::error::LoggingError::from(error)
         }
     };
     ($fmt:expr, $($arg:tt)*) => {
         {
             let error = anyhow::anyhow!($fmt, $($arg)*);
             $crate::error::log_error_chain(&error);
-            $crate::error::AutoLoggingError::from(error)
+            $crate::error::LoggingError::from(error)
         }
     };
 }
