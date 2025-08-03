@@ -1,8 +1,8 @@
 pub mod config;
 pub mod file;
 pub mod formatter;
+pub mod error;
 
-mod error;
 mod utils;
 mod bindings;
 
