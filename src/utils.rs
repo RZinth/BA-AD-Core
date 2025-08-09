@@ -1,4 +1,4 @@
-use crate::log_error_chain;
+use crate::error::log_error_chain;
 
 use anyhow::Result;
 use lazy_regex::regex;
@@ -72,7 +72,7 @@ pub fn run<F>(f: F)
 where
     F: FnOnce() -> Result<()>
 {
-    if let Err(e) = crate::config::init_logging_from_env() {
+    if let Err(e) = crate::config::init_logging_default() {
         error!("Failed to initialize logging: {}", e);
         std::process::exit(1);
     }
@@ -88,7 +88,7 @@ where
     F: FnOnce() -> Fut,
     Fut: Future<Output = Result<()>>,
 {
-    if let Err(e) = crate::config::init_logging_from_env() {
+    if let Err(e) = crate::config::init_logging_default() {
         error!("Failed to initialize logging: {}", e);
         std::process::exit(1);
     }

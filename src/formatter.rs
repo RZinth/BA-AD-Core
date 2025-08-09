@@ -210,8 +210,8 @@ impl<'a> FieldFormatter<'a> {
             result.push_str(message);
         }
 
-        for (field_name, value) in &non_message_fields {
-            let formatted = self.format_field(field_name, value, non_message_fields.len());
+        for (i, (field_name, value)) in non_message_fields.iter().enumerate() {
+            let formatted = self.format_field(field_name, value, non_message_fields.len(), i == 0);
             if !formatted.is_empty() {
                 result.push_str(&formatted);
             }
@@ -220,7 +220,7 @@ impl<'a> FieldFormatter<'a> {
         result
     }
 
-    fn format_field(&self, field_name: &str, value: &str, field_count: usize) -> String {
+    fn format_field(&self, field_name: &str, value: &str, field_count: usize, is_first: bool) -> String {
         let formatted_value = self.format_value(value);
 
         if field_count == 1 {
@@ -231,10 +231,12 @@ impl<'a> FieldFormatter<'a> {
             };
         }
 
+        let separator = if is_first { ": " } else { ", " };
+        
         if self.config.use_ansi_colors {
-            self.format_colored_field(field_name, &formatted_value)
+            self.format_colored_field_with_separator(field_name, &formatted_value, separator)
         } else {
-            format!(" {}={}", field_name, value)
+            format!("{}{}={}", separator, field_name, value)
         }
     }
 
@@ -257,8 +259,6 @@ impl<'a> FieldFormatter<'a> {
             self.format_by_level(value, false)
         }
     }
-
-
 
     fn format_cause_section(&self, value: &str) -> String {
         if let Some(inner) = value
@@ -314,9 +314,9 @@ impl<'a> FieldFormatter<'a> {
         }
     }
 
-    fn format_colored_field(&self, field_name: &str, formatted_value: &str) -> String {
+    fn format_colored_field_with_separator(&self, field_name: &str, formatted_value: &str, separator: &str) -> String {
         if self.is_success {
-            return format!(" {}={}", field_name.green().italic(), formatted_value);
+            return format!("{}{}={}", separator, field_name.green().italic(), formatted_value);
         }
 
         let colored_field = match *self.level {
@@ -326,6 +326,6 @@ impl<'a> FieldFormatter<'a> {
             Level::DEBUG => format!("{}={}", field_name.cyan().italic(), formatted_value),
             Level::TRACE => format!("{}={}", field_name.magenta().italic(), formatted_value),
         };
-        format!(": {}", colored_field)
+        format!("{}{}", separator, colored_field)
     }
 }

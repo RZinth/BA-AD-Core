@@ -53,6 +53,10 @@ impl FeatureConfig {
 pub fn init_logging(config: LoggingConfig) -> Result<()> {
     let feature_config = FeatureConfig::from_features();
 
+    if let Err(e) = crate::error::install_error_hooks() {
+        eprintln!("Failed to install error hooks: {}", e);
+    }
+
     if !feature_config.logs_enabled {
         tracing_subscriber::registry().init();
         return Ok(());
@@ -102,31 +106,4 @@ pub fn init_logging(config: LoggingConfig) -> Result<()> {
 
 pub fn init_logging_default() -> Result<()> {
     init_logging(LoggingConfig::default())
-}
-
-pub fn init_logging_from_env() -> Result<()> {
-    let mut config = LoggingConfig::default();
-
-    if std::env::var("BAAD_JSON_LOGS").is_ok() {
-        config.enable_json = true;
-    }
-
-    if std::env::var("BAAD_JSON_ONLY").is_ok() {
-        config.enable_json = true;
-        config.enable_console = false;
-    }
-
-    if std::env::var("BAAD_VERBOSE").is_ok() {
-        config.verbose_mode = true;
-    }
-
-    if std::env::var("BAAD_NO_COLOR").is_ok() {
-        config.colored_output = false;
-    }
-
-    if std::env::var("BAAD_NO_TIMESTAMPS").is_ok() {
-        config.include_timestamps = false;
-    }
-
-    init_logging(config)
 }

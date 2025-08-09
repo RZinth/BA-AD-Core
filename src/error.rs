@@ -1,92 +1,63 @@
-use once_cell::sync::Lazy;
 use std::sync::Arc;
+use once_cell::sync::Lazy;
+use tracing::{error, warn};
+
+
 
 #[cfg(not(feature = "no_error"))]
 use crate::utils::format_urls;
-
 #[cfg(not(feature = "no_error"))]
 use owo_colors::OwoColorize;
 
-use tracing::warn;
-
-#[cfg(not(feature = "no_error"))]
-use tracing::error;
-
-pub type Result<T> = std::result::Result<T, LoggingError>;
-
-#[derive(Debug)]
-pub struct LoggingError {
-    inner: anyhow::Error,
+pub struct LoggedError {
+    inner: eyre::Report,
 }
 
-impl LoggingError {
-    pub fn new(error: anyhow::Error) -> Self {
-        #[cfg(not(feature = "no_error"))]
+impl LoggedError {
+    pub fn new(error: eyre::Report) -> Self {
         log_error_chain(&error);
-
         Self { inner: error }
     }
+}
 
-    pub fn into_inner(self) -> anyhow::Error {
-        self.inner
+impl std::fmt::Debug for LoggedError {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
     }
 }
 
-impl std::fmt::Display for LoggingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.inner.fmt(f)
+impl std::fmt::Display for LoggedError {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
     }
 }
 
-impl std::error::Error for LoggingError {
+impl std::error::Error for LoggedError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.inner.source()
     }
 }
 
-impl From<anyhow::Error> for LoggingError {
+impl std::process::Termination for LoggedError {
+    fn report(self) -> std::process::ExitCode {
+        std::process::ExitCode::FAILURE
+    }
+}
+
+impl From<anyhow::Error> for LoggedError {
     fn from(error: anyhow::Error) -> Self {
+        let eyre_report = eyre::Report::new(error);
+        Self::new(eyre_report)
+    }
+}
+
+impl From<eyre::Report> for LoggedError {
+    fn from(error: eyre::Report) -> Self {
         Self::new(error)
     }
 }
 
-impl LoggingError {
-    pub fn from_any<E>(err: E) -> Self
-    where
-        E: Into<anyhow::Error>
-    {
-        Self::new(err.into())
-    }
-}
-
-impl From<std::io::Error> for LoggingError {
-    fn from(err: std::io::Error) -> Self {
-        Self::new(anyhow::Error::from(err))
-    }
-}
-
-impl From<String> for LoggingError {
-    fn from(err: String) -> Self {
-        Self::new(anyhow::Error::msg(err))
-    }
-}
-
-impl From<&str> for LoggingError {
-    fn from(err: &str) -> Self {
-        Self::new(anyhow::Error::msg(err.to_string()))
-    }
-}
-
-#[macro_export]
-macro_rules! impl_logging_error_from {
-    ($error_type:ty) => {
-        impl From<$error_type> for $crate::error::LoggingError {
-            fn from(err: $error_type) -> Self {
-                Self::new(anyhow::Error::from(err))
-            }
-        }
-    };
-}
+pub type Result<T> = std::result::Result<T, LoggedError>;
 
 #[derive(Debug, Clone)]
 pub struct ErrorConfig {
@@ -126,7 +97,7 @@ impl ErrorLogger {
         }
     }
 
-    pub fn log_error(&self, error: &anyhow::Error) {
+    pub fn log_error(&self, error: &eyre::Report) {
         #[cfg(feature = "no_error")]
         {
             eprintln!("Error: {}", error);
@@ -142,7 +113,7 @@ impl ErrorLogger {
         }
     }
 
-    pub fn log_recoverable_error(&self, error: &anyhow::Error, recovery_action: &str) {
+    pub fn log_recoverable_error(&self, error: &eyre::Report, recovery_action: &str) {
         warn!(
             error = %error,
             recovery = recovery_action,
@@ -151,9 +122,8 @@ impl ErrorLogger {
     }
 
     #[cfg(not(feature = "no_error"))]
-    fn format_error(&self, error: &anyhow::Error) -> String {
+    fn format_error(&self, error: &eyre::Report) -> String {
         let mut message = error.to_string();
-
         let causes: Vec<String> = error.chain().skip(1).map(|e| e.to_string()).collect();
 
         if !causes.is_empty() {
@@ -177,7 +147,6 @@ impl ErrorLogger {
             .and_then(|s| s.strip_suffix(')'))
         {
             let formatted_inner = self.format_content(inner_content);
-
             format!(
                 "{}{}{}{}",
                 "(".red().bold(),
@@ -202,117 +171,36 @@ impl ErrorLogger {
 
 static GLOBAL_LOGGER: Lazy<ErrorLogger> = Lazy::new(ErrorLogger::new);
 
-pub fn log_error_chain(error: &anyhow::Error) {
+pub fn log_error_chain(error: &eyre::Report) {
     GLOBAL_LOGGER.log_error(error);
 }
 
-pub fn log_recoverable_error(error: &anyhow::Error, recovery_action: &str) {
+pub fn log_recoverable_error(error: &eyre::Report, recovery_action: &str) {
     GLOBAL_LOGGER.log_recoverable_error(error, recovery_action);
 }
 
-pub trait LogError<T> {
-    fn log_error(self) -> anyhow::Result<T>;
+pub fn install_error_hooks() -> eyre::Result<()> {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    
+    ONCE.call_once(|| {
+        std::panic::set_hook(Box::new(|panic_info| {
+            let msg = if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "Unknown panic".to_string()
+            };
 
-    fn log_error_with_context(self, context: &str) -> anyhow::Result<T>;
+            let location = if let Some(location) = panic_info.location() {
+                format!(" at {}:{}:{}", location.file(), location.line(), location.column())
+            } else {
+                String::new()
+            };
 
-    fn log_error_with_logger(self, logger: &ErrorLogger) -> anyhow::Result<T>;
-}
-
-impl<T, E> LogError<T> for std::result::Result<T, E>
-where
-    E: std::error::Error + Send + Sync + 'static,
-{
-    fn log_error(self) -> anyhow::Result<T> {
-        match self {
-            Ok(value) => Ok(value),
-            Err(e) => {
-                let anyhow_error = anyhow::Error::from(e);
-                log_error_chain(&anyhow_error);
-                Err(anyhow_error)
-            }
-        }
-    }
-
-    fn log_error_with_context(self, context: &str) -> anyhow::Result<T> {
-        match self {
-            Ok(value) => Ok(value),
-            Err(e) => {
-                let anyhow_error = anyhow::Error::from(e).context(context.to_string());
-                log_error_chain(&anyhow_error);
-                Err(anyhow_error)
-            }
-        }
-    }
-
-    fn log_error_with_logger(self, logger: &ErrorLogger) -> anyhow::Result<T> {
-        match self {
-            Ok(value) => Ok(value),
-            Err(e) => {
-                let anyhow_error = anyhow::Error::from(e);
-                logger.log_error(&anyhow_error);
-                Err(anyhow_error)
-            }
-        }
-    }
-}
-
-#[macro_export]
-macro_rules! log_and_bail {
-    ($msg:expr) => {
-        {
-            let error = anyhow::anyhow!($msg);
-            $crate::error::log_error_chain(&error);
-            return Err($crate::error::LoggingError::from(error));
-        }
-    };
-    ($fmt:expr, $($arg:tt)*) => {
-        {
-            let error = anyhow::anyhow!($fmt, $($arg)*);
-            $crate::error::log_error_chain(&error);
-            return Err($crate::error::LoggingError::from(error));
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! try_with_log {
-    ($expr:expr) => {
-        match $expr {
-            Ok(val) => val,
-            Err(e) => {
-                let anyhow_error = anyhow::Error::from(e);
-                $crate::error::log_error_chain(&anyhow_error);
-                return Err($crate::error::LoggingError::from(anyhow_error));
-            }
-        }
-    };
-    ($expr:expr, $context:expr) => {
-        match $expr {
-            Ok(val) => val,
-            Err(e) => {
-                use anyhow::Context;
-                let anyhow_error = anyhow::Error::from(e).context($context);
-                $crate::error::log_error_chain(&anyhow_error);
-                return Err($crate::error::LoggingError::from(anyhow_error));
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! error_and_log {
-    ($msg:expr) => {
-        {
-            let error = anyhow::anyhow!($msg);
-            $crate::error::log_error_chain(&error);
-            $crate::error::LoggingError::from(error)
-        }
-    };
-    ($fmt:expr, $($arg:tt)*) => {
-        {
-            let error = anyhow::anyhow!($fmt, $($arg)*);
-            $crate::error::log_error_chain(&error);
-            $crate::error::LoggingError::from(error)
-        }
-    };
+            tracing::error!("Panic occurred: {}{}", msg, location);
+        }));
+    });
+    
+    Ok(())
 }

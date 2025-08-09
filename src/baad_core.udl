@@ -26,8 +26,7 @@ namespace baad_core {
     [Throws=Error]
     void init_logging_default();
 
-    [Throws=Error]
-    void init_logging_from_env();
+
 
     FeatureConfig get_feature_config();
 

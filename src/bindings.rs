@@ -77,9 +77,7 @@ pub fn init_logging_default() -> Result<(), Error> {
     crate::config::init_logging_default().map_err(Error::from)
 }
 
-pub fn init_logging_from_env() -> Result<(), Error> {
-    crate::config::init_logging_from_env().map_err(Error::from)
-}
+
 
 pub fn get_feature_config() -> FeatureConfig {
     crate::config::FeatureConfig::from_features().into()
