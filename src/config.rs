@@ -1,6 +1,6 @@
 use crate::formatter::ConsoleFormatter;
 
-use anyhow::{Context, Result};
+use eyre::{Result, WrapErr};
 use tracing_subscriber::{
     fmt::{self, format::FmtSpan},
     layer::SubscriberExt,
@@ -53,7 +53,10 @@ impl FeatureConfig {
 pub fn init_logging(config: LoggingConfig) -> Result<()> {
     let feature_config = FeatureConfig::from_features();
 
-    if let Err(e) = crate::error::install_error_hooks() {
+    if feature_config.logs_enabled
+        && feature_config.error_enabled
+        && let Err(e) = crate::error::install()
+    {
         eprintln!("Failed to install error hooks: {}", e);
     }
 
@@ -62,7 +65,10 @@ pub fn init_logging(config: LoggingConfig) -> Result<()> {
         return Ok(());
     }
 
-    let env_filter = match (config.verbose_mode, config.enable_debug && feature_config.debug_enabled) {
+    let env_filter = match (
+        config.verbose_mode,
+        config.enable_debug && feature_config.debug_enabled,
+    ) {
         (true, _) => EnvFilter::new("trace"),
         (false, true) => EnvFilter::new("debug"),
         (false, false) => EnvFilter::new("info"),
@@ -99,7 +105,7 @@ pub fn init_logging(config: LoggingConfig) -> Result<()> {
         (false, true) => subscriber.with(json_layer!()).try_init(),
         (false, false) => subscriber.try_init(),
     }
-    .context("Failed to initialize tracing subscriber")?;
+    .wrap_err_with(|| "Failed to initialize tracing subscriber")?;
 
     Ok(())
 }

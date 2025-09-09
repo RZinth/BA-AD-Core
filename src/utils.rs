@@ -1,16 +1,10 @@
-use crate::error::log_error_chain;
-
-use anyhow::Result;
+use eyre::Result;
 use lazy_regex::regex;
 use std::future::Future;
 use tracing::{error, Level};
 
 pub fn contains_url(value: &str) -> bool {
     regex!(r"https?://[^\s]+|ftp://[^\s]+").is_match(value)
-}
-
-pub fn is_cause_section(value: &str) -> bool {
-    value.starts_with("(Cause: ") && value.ends_with(')')
 }
 
 pub fn format_urls<F1, F2>(content: &str, format_text: F1, format_url: F2) -> String
@@ -67,10 +61,9 @@ pub fn get_level_visual_length(level: &Level, is_success: bool) -> usize {
     }
 }
 
-
 pub fn run<F>(f: F)
 where
-    F: FnOnce() -> Result<()>
+    F: FnOnce() -> Result<()>,
 {
     if let Err(e) = crate::config::init_logging_default() {
         error!("Failed to initialize logging: {}", e);
@@ -78,7 +71,7 @@ where
     }
 
     if let Err(e) = f() {
-        log_error_chain(&e);
+        error!("Application error: {:?}", e);
         std::process::exit(1);
     }
 }
@@ -94,7 +87,7 @@ where
     }
 
     if let Err(e) = f().await {
-        log_error_chain(&e);
+        error!("Application error: {:?}", e);
         std::process::exit(1);
     }
 }

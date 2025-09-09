@@ -1,4 +1,6 @@
-use crate::utils::{contains_url, format_urls, get_level_visual_length, is_cause_section, level_to_index};
+use crate::utils::{
+    contains_url, format_urls, get_level_visual_length, level_to_index,
+};
 
 use chrono::{DateTime, Local};
 use owo_colors::OwoColorize;
@@ -14,6 +16,7 @@ use tracing_subscriber::registry::LookupSpan;
 
 const LEVEL_PREFIXES: &[&str] = &["[ERROR]", "[WARN]", "[INFO]", "[DEBUG]", "[TRACE]"];
 const SUCCESS_PREFIX: &str = "[SUCCESS]";
+const CAUSE_PREFIX: &str = "[CAUSE]";
 
 #[derive(Clone)]
 pub struct ConsoleFormatter {
@@ -59,43 +62,98 @@ impl ConsoleFormatter {
         self
     }
 
-    fn format_level_prefix(&self, level: &Level, is_success: bool) -> String {
-        if is_success {
-            return if self.config.use_ansi_colors {
-                format!("{}", SUCCESS_PREFIX.green().bold())
-            } else {
-                SUCCESS_PREFIX.to_string()
-            };
-        }
+    fn write_timestamp(&self, writer: &mut Writer<'_>) -> fmt::Result {
+        let now: DateTime<Local> = Local::now();
+        let timestamp = now.format("%H:%M:%S");
 
-        let prefix = LEVEL_PREFIXES[level_to_index(level)];
-
-        if !self.config.use_ansi_colors {
-            return prefix.to_string();
-        }
-
-        match *level {
-            Level::ERROR => format!("{}", prefix.red().bold()),
-            Level::WARN => format!("{}", prefix.yellow().bold()),
-            Level::INFO => format!("{}", prefix.blue().bold()),
-            Level::DEBUG => format!("{}", prefix.cyan().bold()),
-            Level::TRACE => format!("{}", prefix.magenta().bold()),
+        if self.config.use_ansi_colors {
+            write!(writer, "{}", timestamp.to_string().bright_black())
+        } else {
+            write!(writer, "{}", timestamp)
         }
     }
 
-    fn format_timestamp(&self) -> Option<String> {
-        if !self.config.include_timestamps {
-            return None;
+    fn write_level_prefix(&self, writer: &mut Writer<'_>, level: &Level, is_success: bool) -> fmt::Result {
+        if is_success {
+            if self.config.use_ansi_colors {
+                let visual_length = get_level_visual_length(level, is_success);
+                let padding = 9_usize.saturating_sub(visual_length);
+                write!(writer, "{:width$}{}", "", SUCCESS_PREFIX.green().bold(), width = padding)
+            } else {
+                write!(writer, "{:>9}", SUCCESS_PREFIX)
+            }
+        } else {
+            let prefix = LEVEL_PREFIXES[level_to_index(level)];
+
+            if self.config.use_ansi_colors {
+                let visual_length = get_level_visual_length(level, is_success);
+                let padding = 9_usize.saturating_sub(visual_length);
+                let colored_prefix = match *level {
+                    Level::ERROR => format!("{}", prefix.red().bold()),
+                    Level::WARN => format!("{}", prefix.yellow().bold()),
+                    Level::INFO => format!("{}", prefix.blue().bold()),
+                    Level::DEBUG => format!("{}", prefix.cyan().bold()),
+                    Level::TRACE => format!("{}", prefix.magenta().bold()),
+                };
+                write!(writer, "{:width$}{}", "", colored_prefix, width = padding)
+            } else {
+                write!(writer, "{:>9}", prefix)
+            }
+        }
+    }
+
+    fn write_simple_message(
+        &self,
+        writer: &mut Writer<'_>,
+        level: &Level,
+        is_success: bool,
+        fields: &[(String, String)],
+    ) -> fmt::Result {
+        // Write level prefix directly
+        self.write_level_prefix(writer, level, is_success)?;
+        write!(writer, " ")?;
+
+        // Write message directly (we know it's the only field)
+        if let Some((_, message)) = fields.first() {
+            write!(writer, "{}", message)?;
         }
 
-        let now: DateTime<Local> = Local::now();
-        let timestamp = now.format("%H:%M:%S").to_string();
+        Ok(())
+    }
 
-        Some(if self.config.use_ansi_colors {
-            format!("{}", timestamp.bright_black())
+    fn write_cause_line(&self, writer: &mut Writer<'_>, cause_value: &str) -> fmt::Result {
+        // Write timestamp if enabled
+        if self.config.include_timestamps {
+            self.write_timestamp(writer)?;
+            write!(writer, " ")?;
+        }
+
+        // Write cause prefix
+        if self.config.use_ansi_colors {
+            let visual_length = 7; // "[CAUSE]" length
+            let padding = 9_usize.saturating_sub(visual_length);
+            write!(writer, "{:width$}{} ", "", CAUSE_PREFIX.red().bold(), width = padding)?;
         } else {
-            timestamp
-        })
+            write!(writer, "{:>9} ", CAUSE_PREFIX)?;
+        }
+
+        // Write cause value with appropriate formatting
+        if self.config.use_ansi_colors {
+            if contains_url(cause_value) {
+                let formatted = format_urls(
+                    cause_value,
+                    |text| format!("{}", text.red().italic()),
+                    |url| format!("{}", url.red().italic().underline()),
+                );
+                write!(writer, "{}", formatted)?;
+            } else {
+                write!(writer, "{}", cause_value.red().italic())?;
+            }
+        } else {
+            write!(writer, "{}", cause_value)?;
+        }
+
+        writeln!(writer)
     }
 }
 
@@ -116,28 +174,31 @@ where
 
         let is_success = level == &Level::INFO && visitor.has_success_field();
 
-        if let Some(timestamp) = self.format_timestamp() {
-            write!(writer, "{} ", timestamp)?;
+        if visitor.is_simple_message() && !self.config.include_timestamps {
+            self.write_simple_message(&mut writer, level, is_success, &visitor.fields)?;
+            return writeln!(writer);
         }
 
-        let prefix = self.format_level_prefix(level, is_success);
-        if self.config.use_ansi_colors {
-            let visual_length = get_level_visual_length(level, is_success);
-            let padding = 9_usize.saturating_sub(visual_length);
-            write!(writer, "{:width$}{} ", "", prefix, width = padding)?;
-        } else {
-            write!(writer, "{:>9} ", prefix)?;
+        if self.config.include_timestamps {
+            self.write_timestamp(&mut writer)?;
+            write!(writer, " ")?;
         }
+
+        self.write_level_prefix(&mut writer, level, is_success)?;
+        write!(writer, " ")?;
 
         let formatter = FieldFormatter::new(&self.config, level, is_success);
-        let formatted = formatter.format_fields(&visitor.fields);
-        write!(writer, "{}", formatted)?;
+        formatter.write_fields(&mut writer, &visitor.fields)?;
 
-        writeln!(writer)
+        writeln!(writer)?;
+
+        if let Some(cause_value) = visitor.get_cause_value() {
+            self.write_cause_line(&mut writer, cause_value)?;
+        }
+
+        Ok(())
     }
 }
-
-
 
 struct FieldCollector {
     fields: SmallVec<[(String, String); 4]>,
@@ -154,6 +215,17 @@ impl FieldCollector {
         self.fields
             .iter()
             .any(|(name, value)| name == "success" && value == "true")
+    }
+
+    fn is_simple_message(&self) -> bool {
+        self.fields.len() == 1 && 
+        self.fields.first().map(|(name, _)| name == "message").unwrap_or(false)
+    }
+
+    fn get_cause_value(&self) -> Option<&str> {
+        self.fields.iter()
+            .find(|(name, _)| name == "cause")
+            .map(|(_, value)| value.as_str())
     }
 }
 
@@ -199,96 +271,96 @@ impl<'a> FieldFormatter<'a> {
         }
     }
 
-    fn format_fields(&self, fields: &[(String, String)]) -> String {
-        let mut result = String::new();
+    fn write_fields(&self, writer: &mut Writer<'_>, fields: &[(String, String)]) -> fmt::Result {
         let non_message_fields: SmallVec<[&(String, String); 4]> = fields
             .iter()
-            .filter(|(name, _)| name != "message" && name != "success")
+            .filter(|(name, _)| name != "message" && name != "success" && name != "cause")
             .collect();
 
         if let Some((_, message)) = fields.iter().find(|(name, _)| name == "message") {
-            result.push_str(message);
+            write!(writer, "{}", message)?;
         }
 
         for (i, (field_name, value)) in non_message_fields.iter().enumerate() {
-            let formatted = self.format_field(field_name, value, non_message_fields.len(), i == 0);
-            if !formatted.is_empty() {
-                result.push_str(&formatted);
-            }
+            self.write_field(writer, field_name, value, non_message_fields.len(), i == 0)?;
         }
 
-        result
+        Ok(())
     }
 
-    fn format_field(&self, field_name: &str, value: &str, field_count: usize, is_first: bool) -> String {
-        let formatted_value = self.format_value(value);
-
+    fn write_field(
+        &self,
+        writer: &mut Writer<'_>,
+        field_name: &str,
+        value: &str,
+        field_count: usize,
+        is_first: bool,
+    ) -> fmt::Result {
         if field_count == 1 {
-            return if self.config.use_ansi_colors {
-                format!(": {}", formatted_value)
+            write!(writer, ": ")?;
+            if self.config.use_ansi_colors {
+                self.write_colored_value(writer, value)?;
             } else {
-                format!(": {}", value)
-            };
+                write!(writer, "{}", value)?;
+            }
+            return Ok(());
         }
 
         let separator = if is_first { ": " } else { ", " };
-        
+        write!(writer, "{}", separator)?;
+
         if self.config.use_ansi_colors {
-            self.format_colored_field_with_separator(field_name, &formatted_value, separator)
+            self.write_colored_field(writer, field_name, value)?;
         } else {
-            format!("{}{}={}", separator, field_name, value)
+            write!(writer, "{}={}", field_name, value)?;
         }
+
+        Ok(())
     }
 
-    fn format_value(&self, value: &str) -> String {
+    fn write_colored_value(&self, writer: &mut Writer<'_>, value: &str) -> fmt::Result {
         if !self.config.use_ansi_colors {
-            return value.to_string();
+            return write!(writer, "{}", value);
         }
 
         if self.is_success {
-            return format!("{}", value.green().italic());
+            write!(writer, "{}", value.green().italic())?;
+            return Ok(());
         }
 
-        if is_cause_section(value) {
-            return self.format_cause_section(value);
-        }
-
-        if contains_url(value) {
-            self.format_with_urls(value)
+        if !contains_url(value) {
+            match *self.level {
+                Level::ERROR => write!(writer, "{}", value.red().italic()),
+                Level::WARN => write!(writer, "{}", value.yellow().italic()),
+                Level::INFO => write!(writer, "{}", value.blue().italic()),
+                Level::DEBUG => write!(writer, "{}", value.cyan().italic()),
+                Level::TRACE => write!(writer, "{}", value.magenta().italic()),
+            }
         } else {
-            self.format_by_level(value, false)
+            let formatted = self.format_with_urls(value);
+            write!(writer, "{}", formatted)
         }
     }
 
-    fn format_cause_section(&self, value: &str) -> String {
-        if let Some(inner) = value
-            .strip_prefix("(Cause: ")
-            .and_then(|s| s.strip_suffix(')'))
-        {
-            let formatted_inner = if contains_url(inner) {
-                self.format_cause_urls(inner)
-            } else {
-                format!("{}", inner.red().bold())
-            };
-
-            format!(
-                "{}{}{}{}",
-                "(".red().bold(),
-                "Cause: ".red().bold(),
-                formatted_inner,
-                ")".red().bold()
-            )
-        } else {
-            format!("{}", value.red().bold())
+    fn write_colored_field(&self, writer: &mut Writer<'_>, field_name: &str, value: &str) -> fmt::Result {
+        if self.is_success {
+            write!(writer, "{}=", field_name.green().italic())?;
+            self.write_colored_value(writer, value)?;
+            return Ok(());
         }
-    }
 
-    fn format_cause_urls(&self, content: &str) -> String {
-        format_urls(
-            content,
-            |text| format!("{}", text.red().bold()),
-            |url| format!("{}", url.red().bold().underline()),
-        )
+        let colored_field_name = match *self.level {
+            Level::ERROR => format!("{}", field_name.red().italic()),
+            Level::WARN => format!("{}", field_name.yellow().italic()),
+            Level::INFO => format!("{}", field_name.blue().italic()),
+            Level::DEBUG => format!("{}", field_name.cyan().italic()),
+            Level::TRACE => format!("{}", field_name.magenta().italic()),
+        };
+
+        write!(writer, "{}=", colored_field_name)?;
+        self.write_colored_value(writer, value)?;
+
+        Ok(())
     }
 
     fn format_with_urls(&self, value: &str) -> String {
@@ -314,18 +386,4 @@ impl<'a> FieldFormatter<'a> {
         }
     }
 
-    fn format_colored_field_with_separator(&self, field_name: &str, formatted_value: &str, separator: &str) -> String {
-        if self.is_success {
-            return format!("{}{}={}", separator, field_name.green().italic(), formatted_value);
-        }
-
-        let colored_field = match *self.level {
-            Level::ERROR => format!("{}={}", field_name.red().italic(), formatted_value),
-            Level::WARN => format!("{}={}", field_name.yellow().italic(), formatted_value),
-            Level::INFO => format!("{}={}", field_name.blue().italic(), formatted_value),
-            Level::DEBUG => format!("{}={}", field_name.cyan().italic(), formatted_value),
-            Level::TRACE => format!("{}={}", field_name.magenta().italic(), formatted_value),
-        };
-        format!("{}{}", separator, colored_field)
-    }
 }

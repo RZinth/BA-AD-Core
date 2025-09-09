@@ -1,19 +1,19 @@
 //! # WARNING: Internal UniFFI Bindings Module
-//! 
+//!
 //! This module contains UniFFI binding wrappers and should NOT be used directly in Rust code.
-//! 
+//!
 //! **For Rust users:** Use the functions and types from the main library modules instead:
 //! - `baad_core::config::*` for configuration and logging setup
-//! - `baad_core::file::*` for file operations  
+//! - `baad_core::file::*` for file operations
 //! - `baad_core::error::*` for error handling
 //! - `baad_core::{info, error, warn, debug, trace}` for logging macros
-//! 
+//!
 //! **For other languages (Python, Swift, etc.):** Use the generated bindings from UniFFI.
-//! 
+//!
 //! This module exists solely to provide UniFFI-compatible wrappers that convert between
 //! Rust types and UniFFI-compatible types (e.g., `PathBuf` → `String`, async → sync).
 
-use anyhow::Result;
+use eyre::Result;
 use std::path::PathBuf;
 use std::collections::HashMap;
 
@@ -23,8 +23,8 @@ pub enum Error {
     Generic(String),
 }
 
-impl From<anyhow::Error> for Error {
-    fn from(err: anyhow::Error) -> Self {
+impl From<eyre::Report> for Error {
+    fn from(err: eyre::Report) -> Self {
         Error::Generic(err.to_string())
     }
 }
@@ -77,14 +77,12 @@ pub fn init_logging_default() -> Result<(), Error> {
     crate::config::init_logging_default().map_err(Error::from)
 }
 
-
-
 pub fn get_feature_config() -> FeatureConfig {
     crate::config::FeatureConfig::from_features().into()
 }
 
 pub fn set_app_name(name: String) -> Result<(), Error> {
-    crate::file::set_app_name(&name).map_err(|e| Error::Generic(e))
+    crate::file::set_app_name(&name).map_err(Error::Generic)
 }
 
 pub fn set_data_dir(path: String) -> Result<(), Error> {
@@ -155,12 +153,11 @@ pub fn clear_all(dir: String) -> Result<(), Error> {
 
 
 pub fn log_error_from_string(error_message: String) {
-    let error = anyhow::anyhow!(error_message);
-    crate::error::log_error_chain(&error);
+    tracing::error!("{}", error_message);
 }
 
 pub fn log_recoverable_error_from_string(error_message: String, recovery_action: String) {
-    let error = anyhow::anyhow!(error_message);
+    let error = eyre::eyre!(error_message);
     crate::error::log_recoverable_error(&error, &recovery_action);
 }
 

@@ -1,6 +1,6 @@
 [package]
 name = "baad-core"
-version = "2.2.3"
+version = "2.3.0"
 edition = "2024"
 
 [[bin]]
@@ -22,7 +22,6 @@ no_error = []
 eyre = "0.6"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
-tracing-error = "0.2.1"
 owo-colors = "4.2.2"
 chrono = { version = "0.4", features = ["serde"] }
 lazy-regex = "3.3"
@@ -32,7 +31,6 @@ thiserror = "2.0"
 tokio = { version = "1.47.0", features = ["full"] }
 platform-dirs = "0.3.0"
 uniffi = { version = "0.29.3", features = ["cli"] }
-anyhow = "1.0.98"
 
 [build-dependencies]
 uniffi = { version = "0.29.3", features = [ "build" ] }
