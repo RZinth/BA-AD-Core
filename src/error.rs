@@ -1,6 +1,32 @@
 use eyre::{EyreHandler, Report, Result};
-use tracing::{error, warn};
 use std::sync::Once;
+use tracing::{error, warn};
+
+pub trait IntoEyreReport {
+    fn into_eyre_report(self) -> Report;
+}
+
+impl IntoEyreReport for anyhow::Error {
+    fn into_eyre_report(self) -> Report {
+        let mut report = Report::msg(self.to_string());
+
+        for source in std::iter::successors(self.source(), |e| e.source()) {
+            report = report.wrap_err(source.to_string());
+        }
+
+        report
+    }
+}
+
+pub trait AnyhowToEyre<T> {
+    fn to_eyre(self) -> Result<T>;
+}
+
+impl<T> AnyhowToEyre<T> for anyhow::Result<T> {
+    fn to_eyre(self) -> Result<T> {
+        self.map_err(|e| e.into_eyre_report())
+    }
+}
 
 #[derive(Debug)]
 pub struct TracingHandler;
@@ -23,8 +49,9 @@ impl EyreHandler for TracingHandler {
 
         if let Some(cause) = error.source() {
             error!(cause = %cause, "{}", error);
-            
-            let additional_errors: Vec<_> = std::iter::successors(cause.source(), |e| (*e).source()).collect();
+
+            let additional_errors: Vec<_> =
+                std::iter::successors(cause.source(), |e| (*e).source()).collect();
             for nested_error in additional_errors {
                 error!(cause = %nested_error, "{}", nested_error);
             }
@@ -35,6 +62,7 @@ impl EyreHandler for TracingHandler {
         Ok(())
     }
 }
+
 pub fn log_recoverable_error(error: &Report, recovery_action: &str) {
     if let Some(cause) = error.source() {
         warn!(
