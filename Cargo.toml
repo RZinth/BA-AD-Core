@@ -1,6 +1,6 @@
 [package]
 name = "baad-core"
-version = "2.3.1"
+version = "2.3.2"
 edition = "2024"
 
 [[bin]]

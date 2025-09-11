@@ -24,7 +24,7 @@ fn app_name() -> &'static str {
     APP_NAME
         .get()
         .map(|s| s.as_str())
-        .unwrap_or(env!("CARGO_CRATE_NAME"))
+        .unwrap_or("baad")
 }
 
 static APP_DIRS: Lazy<Result<AppDirs>> = Lazy::new(|| {
