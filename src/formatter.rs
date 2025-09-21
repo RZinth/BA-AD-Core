@@ -109,11 +109,9 @@ impl ConsoleFormatter {
         is_success: bool,
         fields: &[(String, String)],
     ) -> fmt::Result {
-        // Write level prefix directly
         self.write_level_prefix(writer, level, is_success)?;
         write!(writer, " ")?;
 
-        // Write message directly (we know it's the only field)
         if let Some((_, message)) = fields.first() {
             write!(writer, "{}", message)?;
         }
@@ -122,33 +120,26 @@ impl ConsoleFormatter {
     }
 
     fn write_cause_line(&self, writer: &mut Writer<'_>, cause_value: &str) -> fmt::Result {
-        // Write timestamp if enabled
         if self.config.include_timestamps {
             self.write_timestamp(writer)?;
             write!(writer, " ")?;
         }
 
-        // Write cause prefix
         if self.config.use_ansi_colors {
-            let visual_length = 7; // "[CAUSE]" length
+            let visual_length = 7;
             let padding = 9_usize.saturating_sub(visual_length);
-            write!(writer, "{:width$}{} ", "", CAUSE_PREFIX.red().bold(), width = padding)?;
+            write!(writer, "{:width$}{} ", "", CAUSE_PREFIX.truecolor(255, 165, 0).bold(), width = padding)?;
         } else {
             write!(writer, "{:>9} ", CAUSE_PREFIX)?;
         }
 
-        // Write cause value with appropriate formatting
-        if self.config.use_ansi_colors {
-            if contains_url(cause_value) {
-                let formatted = format_urls(
-                    cause_value,
-                    |text| format!("{}", text.red().italic()),
-                    |url| format!("{}", url.red().italic().underline()),
-                );
-                write!(writer, "{}", formatted)?;
-            } else {
-                write!(writer, "{}", cause_value.red().italic())?;
-            }
+        if self.config.use_ansi_colors && contains_url(cause_value) {
+            let formatted = format_urls(
+                cause_value,
+                |text| text.to_string(),
+                |url| format!("{}", url.truecolor(255, 165, 0).italic().underline()),
+            );
+            write!(writer, "{}", formatted)?;
         } else {
             write!(writer, "{}", cause_value)?;
         }

@@ -1,4 +1,4 @@
-use eyre::{eyre, ContextCompat, Result};
+use crate::error::FileError;
 use once_cell::sync::{Lazy, OnceCell};
 use platform_dirs::AppDirs;
 use std::env;
@@ -27,44 +27,44 @@ fn app_name() -> &'static str {
         .unwrap_or("baad")
 }
 
-static APP_DIRS: Lazy<Result<AppDirs>> = Lazy::new(|| {
+static APP_DIRS: Lazy<Result<AppDirs, FileError>> = Lazy::new(|| {
     AppDirs::new(Some(app_name()), true)
-        .wrap_err_with(|| "Failed to create app directories with name")
+        .ok_or(FileError::AppDirectoryCreationFailed)
 });
 
-pub fn data_dir() -> Result<PathBuf> {
+pub fn data_dir() -> Result<PathBuf, FileError> {
     if let Some(path) = DATA_DIR.get() {
         return Ok(path.clone());
     }
 
-    (*APP_DIRS)
+    APP_DIRS
         .as_ref()
         .map(|dirs| dirs.data_dir.clone())
-        .map_err(|e| eyre!(e.to_string()))
+        .map_err(|_| FileError::AppDirectoryCreationFailed)
 }
 
-pub fn get_data_path(filename: &str) -> Result<PathBuf> {
+pub fn get_data_path(filename: &str) -> Result<PathBuf, FileError> {
     let data_dir = data_dir()?;
     Ok(data_dir.join(filename))
 }
 
-pub async fn load_file(path: &Path) -> Result<Vec<u8>> {
+pub async fn load_file(path: &Path) -> Result<Vec<u8>, FileError> {
     Ok(fs::read(path).await?)
 }
 
-pub async fn save_file(path: &Path, content: &[u8]) -> Result<()> {
+pub async fn save_file(path: &Path, content: &[u8]) -> Result<(), FileError> {
     fs::write(path, content).await?;
     Ok(())
 }
 
-pub async fn create_parent_dir(path: &Path) -> Result<()> {
+pub async fn create_parent_dir(path: &Path) -> Result<(), FileError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).await?;
     }
     Ok(())
 }
 
-pub async fn get_output_dir(path: Option<PathBuf>) -> Result<PathBuf> {
+pub async fn get_output_dir(path: Option<PathBuf>) -> Result<PathBuf, FileError> {
     let output_dir = match path {
         Some(path) => path,
         None => env::current_dir()?.join("output"),
@@ -74,14 +74,14 @@ pub async fn get_output_dir(path: Option<PathBuf>) -> Result<PathBuf> {
     Ok(output_dir)
 }
 
-pub async fn is_dir_empty(path: &Path) -> Result<bool> {
+pub async fn is_dir_empty(path: &Path) -> Result<bool, FileError> {
     Ok(!path.exists()
         || path
             .read_dir()
             .map_or(true, |mut entries| entries.next().is_none()))
 }
 
-pub async fn clear_all(dir: &Path) -> Result<()> {
+pub async fn clear_all(dir: &Path) -> Result<(), FileError> {
     if dir.exists() {
         fs::remove_dir_all(dir).await?;
         fs::create_dir_all(dir).await?;

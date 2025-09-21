@@ -1,6 +1,6 @@
 use crate::formatter::ConsoleFormatter;
+use crate::error::ConfigError;
 
-use eyre::{Result, WrapErr};
 use tracing_subscriber::{
     fmt::{self, format::FmtSpan},
     layer::SubscriberExt,
@@ -50,14 +50,14 @@ impl FeatureConfig {
     }
 }
 
-pub fn init_logging(config: LoggingConfig) -> Result<()> {
+pub fn init_logging(config: LoggingConfig) -> Result<(), ConfigError> {
     let feature_config = FeatureConfig::from_features();
 
     if feature_config.logs_enabled
         && feature_config.error_enabled
         && let Err(e) = crate::error::install()
     {
-        eprintln!("Failed to install error hooks: {}", e);
+        return Err(ConfigError::External(Box::new(e)));
     }
 
     if !feature_config.logs_enabled {
@@ -96,7 +96,7 @@ pub fn init_logging(config: LoggingConfig) -> Result<()> {
 
     let subscriber = tracing_subscriber::registry().with(env_filter);
 
-    match (config.enable_console, config.enable_json) {
+    let result = match (config.enable_console, config.enable_json) {
         (true, true) => subscriber
             .with(console_layer!())
             .with(json_layer!())
@@ -104,12 +104,13 @@ pub fn init_logging(config: LoggingConfig) -> Result<()> {
         (true, false) => subscriber.with(console_layer!()).try_init(),
         (false, true) => subscriber.with(json_layer!()).try_init(),
         (false, false) => subscriber.try_init(),
-    }
-    .wrap_err_with(|| "Failed to initialize tracing subscriber")?;
+    };
+
+    result.map_err(|_| ConfigError::LoggingInitFailed)?;
 
     Ok(())
 }
 
-pub fn init_logging_default() -> Result<()> {
+pub fn init_logging_default() -> Result<(), ConfigError> {
     init_logging(LoggingConfig::default())
 }

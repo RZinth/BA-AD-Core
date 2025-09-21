@@ -29,6 +29,18 @@ impl From<eyre::Report> for Error {
     }
 }
 
+impl From<crate::error::FileError> for Error {
+    fn from(err: crate::error::FileError) -> Self {
+        Error::Generic(err.to_string())
+    }
+}
+
+impl From<crate::error::ConfigError> for Error {
+    fn from(err: crate::error::ConfigError) -> Self {
+        Error::Generic(err.to_string())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct LoggingConfig {
     pub enable_console: bool,

@@ -3,7 +3,7 @@ pub mod error;
 pub mod file;
 pub mod formatter;
 
-pub use error::{AnyhowToEyre, IntoEyreReport};
+pub use error::IntoEyreReport;
 
 mod bindings;
 mod utils;

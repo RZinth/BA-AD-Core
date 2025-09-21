@@ -71,7 +71,7 @@ where
     }
 
     if let Err(e) = f() {
-        error!("Application error: {:?}", e);
+        error!("{:?}", e);
         std::process::exit(1);
     }
 }
@@ -87,7 +87,7 @@ where
     }
 
     if let Err(e) = f().await {
-        error!("Application error: {:?}", e);
+        error!("{:?}", e);
         std::process::exit(1);
     }
 }

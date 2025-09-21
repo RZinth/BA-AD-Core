@@ -1,6 +1,7 @@
-use eyre::{EyreHandler, Report, Result};
+use eyre::{EyreHandler, Report};
 use std::sync::Once;
 use tracing::{error, warn};
+use thiserror::Error;
 
 pub trait IntoEyreReport {
     fn into_eyre_report(self) -> Report;
@@ -18,15 +19,6 @@ impl IntoEyreReport for anyhow::Error {
     }
 }
 
-pub trait AnyhowToEyre<T> {
-    fn to_eyre(self) -> Result<T>;
-}
-
-impl<T> AnyhowToEyre<T> for anyhow::Result<T> {
-    fn to_eyre(self) -> Result<T> {
-        self.map_err(|e| e.into_eyre_report())
-    }
-}
 
 #[derive(Debug)]
 pub struct TracingHandler;
@@ -78,8 +70,9 @@ pub fn log_recoverable_error(error: &Report, recovery_action: &str) {
     }
 }
 
-pub fn install() -> Result<()> {
-    eyre::set_hook(Box::new(|_| Box::new(TracingHandler::new())))?;
+pub fn install() -> Result<(), ConfigError> {
+    eyre::set_hook(Box::new(|_| Box::new(TracingHandler::new())))
+        .map_err(|e| ConfigError::External(Box::new(e)))?;
 
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
@@ -102,4 +95,25 @@ pub fn install() -> Result<()> {
     });
 
     Ok(())
+}
+
+#[derive(Error, Debug)]
+pub enum FileError {
+    #[error("{0}")]
+    Io(#[from] std::io::Error),
+    
+    #[error(transparent)]
+    External(Box<dyn std::error::Error + Send + Sync>),
+    
+    #[error("Failed to create app directories")]
+    AppDirectoryCreationFailed,
+}
+
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    #[error(transparent)]
+    External(Box<dyn std::error::Error + Send + Sync>),
+    
+    #[error("Failed to initialize logging")]
+    LoggingInitFailed,
 }
