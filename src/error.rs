@@ -40,12 +40,22 @@ impl EyreHandler for TracingHandler {
         }
 
         if let Some(cause) = error.source() {
-            error!(cause = %cause, "{}", error);
+            if cause.to_string() == error.to_string() {
+                error!("{}", error);
+            } else {
+                error!(cause = %cause, "{}", error);
+            }
 
-            let additional_errors: Vec<_> =
-                std::iter::successors(cause.source(), |e| (*e).source()).collect();
+            let mut prev_message = cause.to_string();
+            let additional_errors: Vec<_> = std::iter::successors(cause.source(), |e| (*e).source()).collect();
+            
             for nested_error in additional_errors {
-                error!(cause = %nested_error, "{}", nested_error);
+                let nested_message = nested_error.to_string();
+                
+                if nested_message != prev_message {
+                    error!(cause = %nested_error, "{}", nested_error);
+                    prev_message = nested_message;
+                }
             }
         } else {
             error!("{}", error);
@@ -57,11 +67,18 @@ impl EyreHandler for TracingHandler {
 
 pub fn log_recoverable_error(error: &Report, recovery_action: &str) {
     if let Some(cause) = error.source() {
-        warn!(
-            cause = %cause,
-            recovery = recovery_action,
-            "Recoverable error, continuing: {}", error
-        );
+        if cause.to_string() == error.to_string() {
+            warn!(
+                recovery = recovery_action,
+                "Recoverable error, continuing: {}", error
+            );
+        } else {
+            warn!(
+                cause = %cause,
+                recovery = recovery_action,
+                "Recoverable error, continuing: {}", error
+            );
+        }
     } else {
         warn!(
             recovery = recovery_action,
