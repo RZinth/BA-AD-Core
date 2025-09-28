@@ -39,26 +39,15 @@ impl EyreHandler for TracingHandler {
             return std::fmt::Debug::fmt(error, f);
         }
 
-        if let Some(cause) = error.source() {
-            if cause.to_string() == error.to_string() {
-                error!("{}", error);
-            } else {
-                error!(cause = %cause, "{}", error);
-            }
+        let mut prev_msg = error.to_string();
+        error!("{}", error);
 
-            let mut prev_message = cause.to_string();
-            let additional_errors: Vec<_> = std::iter::successors(cause.source(), |e| (*e).source()).collect();
-            
-            for nested_error in additional_errors {
-                let nested_message = nested_error.to_string();
-                
-                if nested_message != prev_message {
-                    error!(cause = %nested_error, "{}", nested_error);
-                    prev_message = nested_message;
-                }
+        for cause in std::iter::successors(error.source(), |e| (*e).source()) {
+            let cause_msg = cause.to_string();
+            if cause_msg != prev_msg {
+                error!("{}", cause);
             }
-        } else {
-            error!("{}", error);
+            prev_msg = cause_msg;
         }
 
         Ok(())

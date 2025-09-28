@@ -75,14 +75,19 @@ pub fn init_logging(config: LoggingConfig) -> Result<(), ConfigError> {
     };
 
     macro_rules! console_layer {
-        () => {
-            fmt::layer().event_format(
-                ConsoleFormatter::new()
-                    .with_ansi_colors(config.colored_output)
-                    .with_timestamps(config.include_timestamps),
-            )
-        };
-    }
+    () => {
+        {
+            let mut formatter = ConsoleFormatter::new()
+                .with_timestamps(config.include_timestamps);
+
+            if !config.colored_output {
+                formatter = formatter.with_ansi_colors(false);
+            }
+
+            fmt::layer().event_format(formatter)
+        }
+    };
+}
 
     macro_rules! json_layer {
         () => {

@@ -47,7 +47,7 @@ impl ConsoleFormatter {
     pub fn new() -> Self {
         let color_support = Self::detect_color();
 
-        if !matches!(color_support, ColorSupport::TrueColor) {
+        if matches!(color_support, ColorSupport::TrueColor) {
             set_override(true);
         }
 
