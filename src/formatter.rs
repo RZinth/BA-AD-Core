@@ -1,12 +1,11 @@
-use crate::utils::{
-    contains_url, format_urls, get_level_visual_length, level_to_index,
-};
+use crate::utils::{contains_url, format_urls, get_level_visual_length, level_to_index};
 
 use chrono::{DateTime, Local};
-use owo_colors::OwoColorize;
+use owo_colors::{set_override, OwoColorize};
 use smallvec::SmallVec;
 use std::fmt;
 use std::sync::Arc;
+use supports_color::Stream;
 use tracing::{
     field::{Field, Visit}, Event, Level,
     Subscriber,
@@ -18,6 +17,14 @@ const LEVEL_PREFIXES: &[&str] = &["[ERROR]", "[WARN]", "[INFO]", "[DEBUG]", "[TR
 const SUCCESS_PREFIX: &str = "[SUCCESS]";
 const CAUSE_PREFIX: &str = "[CAUSE]";
 
+#[derive(Debug, Clone, Copy)]
+pub enum ColorSupport {
+    None,
+    Ansi,
+    Extended,
+    TrueColor,
+}
+
 #[derive(Clone)]
 pub struct ConsoleFormatter {
     config: Arc<FormatterConfig>,
@@ -25,7 +32,7 @@ pub struct ConsoleFormatter {
 
 #[derive(Debug, Clone)]
 struct FormatterConfig {
-    use_ansi_colors: bool,
+    color_support: ColorSupport,
     include_timestamps: bool,
     include_spans: bool,
 }
@@ -38,17 +45,44 @@ impl Default for ConsoleFormatter {
 
 impl ConsoleFormatter {
     pub fn new() -> Self {
+        let color_support = Self::detect_color();
+
+        if !matches!(color_support, ColorSupport::TrueColor) {
+            set_override(true);
+        }
+
         Self {
             config: Arc::new(FormatterConfig {
-                use_ansi_colors: true,
+                color_support,
                 include_timestamps: false,
                 include_spans: false,
             }),
         }
     }
 
+    fn detect_color() -> ColorSupport {
+        match supports_color::on(Stream::Stdout) {
+            Some(level) => match (level.has_16m, level.has_256, level.has_basic) {
+                (true, _, _) => ColorSupport::TrueColor,
+                (_, true, _) => ColorSupport::Extended,
+                (_, _, true) => ColorSupport::Ansi,
+                _ => ColorSupport::None,
+            },
+            None => ColorSupport::None,
+        }
+    }
+
+    pub fn with_color_support(mut self, color_support: ColorSupport) -> Self {
+        Arc::make_mut(&mut self.config).color_support = color_support;
+        self
+    }
+
     pub fn with_ansi_colors(mut self, use_ansi_colors: bool) -> Self {
-        Arc::make_mut(&mut self.config).use_ansi_colors = use_ansi_colors;
+        Arc::make_mut(&mut self.config).color_support = if use_ansi_colors {
+            ColorSupport::Ansi
+        } else {
+            ColorSupport::None
+        };
         self
     }
 
@@ -66,26 +100,39 @@ impl ConsoleFormatter {
         let now: DateTime<Local> = Local::now();
         let timestamp = now.format("%H:%M:%S");
 
-        if self.config.use_ansi_colors {
+        if !matches!(self.config.color_support, ColorSupport::None) {
             write!(writer, "{}", timestamp.to_string().bright_black())
         } else {
             write!(writer, "{}", timestamp)
         }
     }
 
-    fn write_level_prefix(&self, writer: &mut Writer<'_>, level: &Level, is_success: bool) -> fmt::Result {
+    fn write_level_prefix(
+        &self,
+        writer: &mut Writer<'_>,
+        level: &Level,
+        is_success: bool,
+    ) -> fmt::Result {
+        let use_colors = !matches!(self.config.color_support, ColorSupport::None);
+
         if is_success {
-            if self.config.use_ansi_colors {
+            if use_colors {
                 let visual_length = get_level_visual_length(level, is_success);
                 let padding = 9_usize.saturating_sub(visual_length);
-                write!(writer, "{:width$}{}", "", SUCCESS_PREFIX.green().bold(), width = padding)
+                write!(
+                    writer,
+                    "{:width$}{}",
+                    "",
+                    SUCCESS_PREFIX.green().bold(),
+                    width = padding
+                )
             } else {
                 write!(writer, "{:>9}", SUCCESS_PREFIX)
             }
         } else {
             let prefix = LEVEL_PREFIXES[level_to_index(level)];
 
-            if self.config.use_ansi_colors {
+            if use_colors {
                 let visual_length = get_level_visual_length(level, is_success);
                 let padding = 9_usize.saturating_sub(visual_length);
                 let colored_prefix = match *level {
@@ -120,20 +167,28 @@ impl ConsoleFormatter {
     }
 
     fn write_cause_line(&self, writer: &mut Writer<'_>, cause_value: &str) -> fmt::Result {
+        let use_colors = !matches!(self.config.color_support, ColorSupport::None);
+
         if self.config.include_timestamps {
             self.write_timestamp(writer)?;
             write!(writer, " ")?;
         }
 
-        if self.config.use_ansi_colors {
+        if use_colors {
             let visual_length = 7;
             let padding = 9_usize.saturating_sub(visual_length);
-            write!(writer, "{:width$}{} ", "", CAUSE_PREFIX.truecolor(255, 165, 0).bold(), width = padding)?;
+            write!(
+                writer,
+                "{:width$}{} ",
+                "",
+                CAUSE_PREFIX.truecolor(255, 165, 0).bold(),
+                width = padding
+            )?;
         } else {
             write!(writer, "{:>9} ", CAUSE_PREFIX)?;
         }
 
-        if self.config.use_ansi_colors && contains_url(cause_value) {
+        if use_colors && contains_url(cause_value) {
             let formatted = format_urls(
                 cause_value,
                 |text| text.to_string(),
@@ -209,12 +264,17 @@ impl FieldCollector {
     }
 
     fn is_simple_message(&self) -> bool {
-        self.fields.len() == 1 && 
-        self.fields.first().map(|(name, _)| name == "message").unwrap_or(false)
+        self.fields.len() == 1
+            && self
+                .fields
+                .first()
+                .map(|(name, _)| name == "message")
+                .unwrap_or(false)
     }
 
     fn get_cause_value(&self) -> Option<&str> {
-        self.fields.iter()
+        self.fields
+            .iter()
             .find(|(name, _)| name == "cause")
             .map(|(_, value)| value.as_str())
     }
@@ -287,9 +347,11 @@ impl<'a> FieldFormatter<'a> {
         field_count: usize,
         is_first: bool,
     ) -> fmt::Result {
+        let use_colors = !matches!(self.config.color_support, ColorSupport::None);
+
         if field_count == 1 {
             write!(writer, ": ")?;
-            if self.config.use_ansi_colors {
+            if use_colors {
                 self.write_colored_value(writer, value)?;
             } else {
                 write!(writer, "{}", value)?;
@@ -300,7 +362,7 @@ impl<'a> FieldFormatter<'a> {
         let separator = if is_first { ": " } else { ", " };
         write!(writer, "{}", separator)?;
 
-        if self.config.use_ansi_colors {
+        if use_colors {
             self.write_colored_field(writer, field_name, value)?;
         } else {
             write!(writer, "{}={}", field_name, value)?;
@@ -310,7 +372,7 @@ impl<'a> FieldFormatter<'a> {
     }
 
     fn write_colored_value(&self, writer: &mut Writer<'_>, value: &str) -> fmt::Result {
-        if !self.config.use_ansi_colors {
+        if matches!(self.config.color_support, ColorSupport::None) {
             return write!(writer, "{}", value);
         }
 
@@ -333,7 +395,12 @@ impl<'a> FieldFormatter<'a> {
         }
     }
 
-    fn write_colored_field(&self, writer: &mut Writer<'_>, field_name: &str, value: &str) -> fmt::Result {
+    fn write_colored_field(
+        &self,
+        writer: &mut Writer<'_>,
+        field_name: &str,
+        value: &str,
+    ) -> fmt::Result {
         if self.is_success {
             write!(writer, "{}=", field_name.green().italic())?;
             self.write_colored_value(writer, value)?;
@@ -376,5 +443,4 @@ impl<'a> FieldFormatter<'a> {
             (Level::TRACE, false) => format!("{}", value.magenta().italic()),
         }
     }
-
 }
