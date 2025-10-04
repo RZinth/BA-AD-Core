@@ -32,14 +32,14 @@ static APP_DIRS: Lazy<Result<AppDirs, FileError>> = Lazy::new(|| {
         .ok_or(FileError::AppDirectoryCreationFailed)
 });
 
-pub fn data_dir() -> Result<PathBuf, FileError> {
+pub fn data_dir() -> Result<&'static Path, FileError> {
     if let Some(path) = DATA_DIR.get() {
-        return Ok(path.clone());
+        return Ok(path.as_path());
     }
 
     APP_DIRS
         .as_ref()
-        .map(|dirs| dirs.data_dir.clone())
+        .map(|dirs| dirs.data_dir.as_path())
         .map_err(|_| FileError::AppDirectoryCreationFailed)
 }
 

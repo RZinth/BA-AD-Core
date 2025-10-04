@@ -14,7 +14,6 @@ pub struct LoggingConfig {
     pub enable_json: bool,
     pub enable_debug: bool,
     pub verbose_mode: bool,
-    pub colored_output: bool,
     pub include_timestamps: bool,
 }
 
@@ -27,7 +26,6 @@ impl Default for LoggingConfig {
             enable_json: false,
             enable_debug: feature_config.debug_enabled,
             verbose_mode: false,
-            colored_output: true,
             include_timestamps: true,
         }
     }
@@ -75,19 +73,13 @@ pub fn init_logging(config: LoggingConfig) -> Result<(), ConfigError> {
     };
 
     macro_rules! console_layer {
-    () => {
-        {
-            let mut formatter = ConsoleFormatter::new()
-                .with_timestamps(config.include_timestamps);
-
-            if !config.colored_output {
-                formatter = formatter.with_ansi_colors(false);
-            }
-
-            fmt::layer().event_format(formatter)
-        }
-    };
-}
+        () => {
+            fmt::layer().event_format(
+                ConsoleFormatter::new()
+                    .with_timestamps(config.include_timestamps)
+            )
+        };
+    }
 
     macro_rules! json_layer {
         () => {

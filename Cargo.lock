@@ -103,7 +103,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "baad-core"
-version = "2.5.1"
+version = "2.6.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -113,7 +113,6 @@ dependencies = [
  "owo-colors",
  "platform-dirs",
  "smallvec",
- "supports-color 3.0.2",
  "thiserror 2.0.12",
  "tokio",
  "tracing",
