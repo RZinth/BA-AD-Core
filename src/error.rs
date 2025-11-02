@@ -1,7 +1,7 @@
 use eyre::{EyreHandler, Report};
 use std::sync::Once;
-use tracing::{error, warn};
 use thiserror::Error;
+use tracing::{error, warn};
 
 pub trait IntoEyreReport {
     fn into_eyre_report(self) -> Report;
@@ -18,7 +18,6 @@ impl IntoEyreReport for anyhow::Error {
         report
     }
 }
-
 
 #[derive(Debug)]
 pub struct TracingHandler;
@@ -105,21 +104,27 @@ pub fn install() -> Result<(), ConfigError> {
 
 #[derive(Error, Debug)]
 pub enum FileError {
-    #[error("{0}")]
+    #[error(transparent)]
     Io(#[from] std::io::Error),
-    
+
     #[error(transparent)]
     External(Box<dyn std::error::Error + Send + Sync>),
-    
+
     #[error("Failed to create app directories")]
     AppDirectoryCreationFailed,
+
+    #[error("App name has already been set")]
+    AppNameAlreadySet,
+
+    #[error("Data directory has already been set")]
+    DataDirAlreadySet,
 }
 
 #[derive(Error, Debug)]
 pub enum ConfigError {
     #[error(transparent)]
     External(Box<dyn std::error::Error + Send + Sync>),
-    
+
     #[error("Failed to initialize logging")]
     LoggingInitFailed,
 }

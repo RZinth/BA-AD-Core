@@ -1,7 +1,7 @@
 use eyre::Result;
 use lazy_regex::regex;
 use std::future::Future;
-use tracing::{error, Level};
+use tracing::{Level, error};
 
 pub fn contains_url(value: &str) -> bool {
     regex!(r"https?://[^\s]+|ftp://[^\s]+").is_match(value)

@@ -6,10 +6,10 @@ use smallvec::SmallVec;
 use std::fmt;
 use std::sync::Arc;
 use tracing::{
-    field::{Field, Visit}, Event, Level,
-    Subscriber,
+    Event, Level, Subscriber,
+    field::{Field, Visit},
 };
-use tracing_subscriber::fmt::{format::Writer, FmtContext, FormatEvent, FormatFields};
+use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields, format::Writer};
 use tracing_subscriber::registry::LookupSpan;
 
 const LEVEL_PREFIXES: &[&str] = &["[ERROR]", "[WARN]", "[INFO]", "[DEBUG]", "[TRACE]"];

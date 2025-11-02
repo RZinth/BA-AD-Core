@@ -1,11 +1,11 @@
-use crate::formatter::ConsoleFormatter;
 use crate::error::ConfigError;
+use crate::formatter::ConsoleFormatter;
 
 use tracing_subscriber::{
+    EnvFilter,
     fmt::{self, format::FmtSpan},
     layer::SubscriberExt,
     util::SubscriberInitExt,
-    EnvFilter,
 };
 
 #[derive(Debug, Clone)]
@@ -74,10 +74,8 @@ pub fn init_logging(config: LoggingConfig) -> Result<(), ConfigError> {
 
     macro_rules! console_layer {
         () => {
-            fmt::layer().event_format(
-                ConsoleFormatter::new()
-                    .with_timestamps(config.include_timestamps)
-            )
+            fmt::layer()
+                .event_format(ConsoleFormatter::new().with_timestamps(config.include_timestamps))
         };
     }
 

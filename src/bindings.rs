@@ -13,33 +13,10 @@
 //! This module exists solely to provide UniFFI-compatible wrappers that convert between
 //! Rust types and UniFFI-compatible types (e.g., `PathBuf` → `String`, async → sync).
 
-use eyre::Result;
-use std::path::PathBuf;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("{0}")]
-    Generic(String),
-}
-
-impl From<eyre::Report> for Error {
-    fn from(err: eyre::Report) -> Self {
-        Error::Generic(err.to_string())
-    }
-}
-
-impl From<crate::error::FileError> for Error {
-    fn from(err: crate::error::FileError) -> Self {
-        Error::Generic(err.to_string())
-    }
-}
-
-impl From<crate::error::ConfigError> for Error {
-    fn from(err: crate::error::ConfigError) -> Self {
-        Error::Generic(err.to_string())
-    }
-}
+pub use crate::error::{ConfigError, FileError};
 
 #[derive(Debug, Clone)]
 pub struct LoggingConfig {
@@ -47,7 +24,6 @@ pub struct LoggingConfig {
     pub enable_json: bool,
     pub enable_debug: bool,
     pub verbose_mode: bool,
-    pub colored_output: bool,
     pub include_timestamps: bool,
 }
 
@@ -58,7 +34,6 @@ impl From<LoggingConfig> for crate::config::LoggingConfig {
             enable_json: config.enable_json,
             enable_debug: config.enable_debug,
             verbose_mode: config.verbose_mode,
-            colored_output: config.colored_output,
             include_timestamps: config.include_timestamps,
         }
     }
@@ -81,88 +56,66 @@ impl From<crate::config::FeatureConfig> for FeatureConfig {
     }
 }
 
-pub fn init_logging(config: LoggingConfig) -> Result<(), Error> {
-    crate::config::init_logging(config.into()).map_err(Error::from)
+pub fn init_logging(config: LoggingConfig) -> Result<(), ConfigError> {
+    crate::config::init_logging(config.into())
 }
 
-pub fn init_logging_default() -> Result<(), Error> {
-    crate::config::init_logging_default().map_err(Error::from)
+pub fn init_logging_default() -> Result<(), ConfigError> {
+    crate::config::init_logging_default()
 }
 
 pub fn get_feature_config() -> FeatureConfig {
     crate::config::FeatureConfig::from_features().into()
 }
 
-pub fn set_app_name(name: String) -> Result<(), Error> {
-    crate::file::set_app_name(&name).map_err(Error::Generic)
+pub fn set_app_name(name: String) -> Result<(), FileError> {
+    crate::file::set_app_name(&name)
 }
 
-pub fn set_data_dir(path: String) -> Result<(), Error> {
+pub fn set_data_dir(path: String) -> Result<(), FileError> {
     let path_buf = PathBuf::from(path);
-    crate::file::set_data_dir(path_buf).map_err(|e| Error::Generic(format!("{:?}", e)))
+    crate::file::set_data_dir(path_buf)
 }
 
-pub fn data_dir() -> Result<String, Error> {
-    crate::file::data_dir()
-        .map(|p| p.to_string_lossy().to_string())
-        .map_err(Error::from)
+pub fn data_dir() -> Result<String, FileError> {
+    crate::file::data_dir().map(|p| p.to_string_lossy().to_string())
 }
 
-pub fn get_data_path(filename: String) -> Result<String, Error> {
-    crate::file::get_data_path(&filename)
-        .map(|p| p.to_string_lossy().to_string())
-        .map_err(Error::from)
+pub fn get_data_path(filename: String) -> Result<String, FileError> {
+    crate::file::get_data_path(&filename).map(|p| p.to_string_lossy().to_string())
 }
 
-pub fn load_file(path: String) -> Result<Vec<u8>, Error> {
+pub async fn load_file(path: String) -> Result<Vec<u8>, FileError> {
     let path_buf = PathBuf::from(path);
-    tokio::runtime::Runtime::new()
-        .unwrap()
-        .block_on(crate::file::load_file(&path_buf))
-        .map_err(Error::from)
+    crate::file::load_file(&path_buf).await
 }
 
-pub fn save_file(path: String, content: Vec<u8>) -> Result<(), Error> {
+pub async fn save_file(path: String, content: Vec<u8>) -> Result<(), FileError> {
     let path_buf = PathBuf::from(path);
-    tokio::runtime::Runtime::new()
-        .unwrap()
-        .block_on(crate::file::save_file(&path_buf, &content))
-        .map_err(Error::from)
+    crate::file::save_file(&path_buf, &content).await
 }
 
-pub fn create_parent_dir(path: String) -> Result<(), Error> {
+pub async fn create_parent_dir(path: String) -> Result<(), FileError> {
     let path_buf = PathBuf::from(path);
-    tokio::runtime::Runtime::new()
-        .unwrap()
-        .block_on(crate::file::create_parent_dir(&path_buf))
-        .map_err(Error::from)
+    crate::file::create_parent_dir(&path_buf).await
 }
 
-pub fn get_output_dir(path: Option<String>) -> Result<String, Error> {
+pub async fn get_output_dir(path: Option<String>) -> Result<String, FileError> {
     let path_buf = path.map(PathBuf::from);
-    tokio::runtime::Runtime::new()
-        .unwrap()
-        .block_on(crate::file::get_output_dir(path_buf))
+    crate::file::get_output_dir(path_buf)
+        .await
         .map(|p| p.to_string_lossy().to_string())
-        .map_err(Error::from)
 }
 
-pub fn is_dir_empty(path: String) -> Result<bool, Error> {
+pub async fn is_dir_empty(path: String) -> Result<bool, FileError> {
     let path_buf = PathBuf::from(path);
-    tokio::runtime::Runtime::new()
-        .unwrap()
-        .block_on(crate::file::is_dir_empty(&path_buf))
-        .map_err(Error::from)
+    crate::file::is_dir_empty(&path_buf).await
 }
 
-pub fn clear_all(dir: String) -> Result<(), Error> {
+pub async fn clear_all(dir: String) -> Result<(), FileError> {
     let path_buf = PathBuf::from(dir);
-    tokio::runtime::Runtime::new()
-        .unwrap()
-        .block_on(crate::file::clear_all(&path_buf))
-        .map_err(Error::from)
+    crate::file::clear_all(&path_buf).await
 }
-
 
 pub fn log_error_from_string(error_message: String) {
     tracing::error!("{}", error_message);
