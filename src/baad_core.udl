@@ -19,6 +19,7 @@ dictionary LoggingConfig {
     boolean enable_debug;
     boolean verbose_mode;
     boolean include_timestamps;
+    boolean enable_async_writer;
 };
 
 dictionary FeatureConfig {
@@ -37,50 +38,50 @@ namespace baad_core {
     FeatureConfig get_feature_config();
 
     [Throws=FileError]
-    void set_app_name(string name);
+    void set_app_name([ByRef] string name);
 
     [Throws=FileError]
-    void set_data_dir(string path);
+    void set_data_dir([ByRef] string path);
 
     [Throws=FileError]
     string data_dir();
 
     [Throws=FileError]
-    string get_data_path(string filename);
+    string get_data_path([ByRef] string filename);
 
     [Async, Throws=FileError]
-    bytes load_file(string path);
+    bytes load_file([ByRef] string path);
 
     [Async, Throws=FileError]
-    void save_file(string path, bytes content);
+    void save_file([ByRef] string path, [ByRef] bytes content);
 
     [Async, Throws=FileError]
-    void create_parent_dir(string path);
+    void create_parent_dir([ByRef] string path);
 
     [Async, Throws=FileError]
     string get_output_dir(string? path);
 
     [Async, Throws=FileError]
-    boolean is_dir_empty(string path);
+    boolean is_dir_empty([ByRef] string path);
 
     [Async, Throws=FileError]
-    void clear_all(string dir);
+    void clear_all([ByRef] string dir);
 
-    void log_error_from_string(string error_message);
-    void log_recoverable_error_from_string(string error_message, string recovery_action);
-    void log_info(string message);
-    void log_error(string message);
-    void log_warn(string message);
-    void log_debug(string message);
-    void log_trace(string message);
-    void log_info_with_field(string message, string field_name, string field_value);
-    void log_error_with_field(string message, string field_name, string field_value);
-    void log_warn_with_field(string message, string field_name, string field_value);
-    void log_debug_with_field(string message, string field_name, string field_value);
-    void log_trace_with_field(string message, string field_name, string field_value);
-    void log_info_with_fields(string message, record<string, string> fields);
-    void log_error_with_fields(string message, record<string, string> fields);
-    void log_warn_with_fields(string message, record<string, string> fields);
-    void log_debug_with_fields(string message, record<string, string> fields);
-    void log_trace_with_fields(string message, record<string, string> fields);
+    void log_error_from_string([ByRef] string error_message);
+    void log_recoverable_error_from_string([ByRef] string error_message, [ByRef] string recovery_action);
+    void log_info([ByRef] string message);
+    void log_error([ByRef] string message);
+    void log_warn([ByRef] string message);
+    void log_debug([ByRef] string message);
+    void log_trace([ByRef] string message);
+    void log_info_with_field([ByRef] string message, [ByRef] string field_name, [ByRef] string field_value);
+    void log_error_with_field([ByRef] string message, [ByRef] string field_name, [ByRef] string field_value);
+    void log_warn_with_field([ByRef] string message, [ByRef] string field_name, [ByRef] string field_value);
+    void log_debug_with_field([ByRef] string message, [ByRef] string field_name, [ByRef] string field_value);
+    void log_trace_with_field([ByRef] string message, [ByRef] string field_name, [ByRef] string field_value);
+    void log_info_with_fields([ByRef] string message, record<string, string> fields);
+    void log_error_with_fields([ByRef] string message, record<string, string> fields);
+    void log_warn_with_fields([ByRef] string message, record<string, string> fields);
+    void log_debug_with_fields([ByRef] string message, record<string, string> fields);
+    void log_trace_with_fields([ByRef] string message, record<string, string> fields);
 };

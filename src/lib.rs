@@ -1,3 +1,4 @@
+pub mod async_writer;
 pub mod config;
 pub mod error;
 pub mod file;

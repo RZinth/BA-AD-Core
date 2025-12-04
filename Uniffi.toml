@@ -14,6 +14,7 @@ cdylib_name = "baad_core"
 [bindings.csharp]
 cdylib_name = "baad_core"
 namespace = "BAAD.Core"
+access_modifier = "public"
 
 [bindings.go]
 cdylib_name = "baad_core"

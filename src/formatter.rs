@@ -3,6 +3,7 @@ use crate::utils::{contains_url, format_urls, get_level_visual_length, level_to_
 use chrono::{DateTime, Local};
 use owo_colors::{OwoColorize, Stream, Style};
 use smallvec::SmallVec;
+use std::borrow::Cow;
 use std::fmt;
 use std::sync::Arc;
 use tracing::{
@@ -60,6 +61,7 @@ impl ConsoleFormatter {
         }
     }
 
+    #[inline]
     fn get_level_style(level: &Level) -> Style {
         match *level {
             Level::ERROR => ERROR_STYLE,
@@ -124,7 +126,7 @@ impl ConsoleFormatter {
         writer: &mut Writer<'_>,
         level: &Level,
         is_success: bool,
-        fields: &[(String, String)],
+        fields: &[(&'static str, Cow<'static, str>)],
     ) -> fmt::Result {
         self.write_level_prefix(writer, level, is_success)?;
         write!(writer, " ")?;
@@ -223,63 +225,71 @@ where
 }
 
 struct FieldCollector {
-    fields: SmallVec<[(String, String); 4]>,
+    fields: SmallVec<[(&'static str, Cow<'static, str>); 4]>,
 }
 
 impl FieldCollector {
+    #[inline]
     fn new() -> Self {
         Self {
             fields: SmallVec::new(),
         }
     }
 
+    #[inline]
     fn has_success_field(&self) -> bool {
         self.fields
             .iter()
-            .any(|(name, value)| name == "success" && value == "true")
+            .any(|(name, value)| *name == "success" && value == "true")
     }
 
+    #[inline]
     fn is_simple_message(&self) -> bool {
         self.fields.len() == 1
             && self
                 .fields
                 .first()
-                .map(|(name, _)| name == "message")
+                .map(|(name, _)| *name == "message")
                 .unwrap_or(false)
     }
 
+    #[inline]
     fn get_cause_value(&self) -> Option<&str> {
         self.fields
             .iter()
-            .find(|(name, _)| name == "cause")
-            .map(|(_, value)| value.as_str())
+            .find(|(name, _)| *name == "cause")
+            .map(|(_, value)| value.as_ref())
     }
 }
 
 impl Visit for FieldCollector {
     fn record_i64(&mut self, field: &Field, value: i64) {
+        let mut buf = itoa::Buffer::new();
         self.fields
-            .push((field.name().to_string(), value.to_string()));
+            .push((field.name(), Cow::Owned(buf.format(value).to_owned())));
     }
 
     fn record_u64(&mut self, field: &Field, value: u64) {
+        let mut buf = itoa::Buffer::new();
         self.fields
-            .push((field.name().to_string(), value.to_string()));
+            .push((field.name(), Cow::Owned(buf.format(value).to_owned())));
     }
 
     fn record_bool(&mut self, field: &Field, value: bool) {
-        self.fields
-            .push((field.name().to_string(), value.to_string()));
+        self.fields.push((
+            field.name(),
+            Cow::Borrowed(if value { "true" } else { "false" }),
+        ));
     }
 
     fn record_str(&mut self, field: &Field, value: &str) {
         self.fields
-            .push((field.name().to_string(), value.to_string()));
+            .push((field.name(), Cow::Owned(value.to_owned())));
     }
 
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
         self.fields
-            .push((field.name().to_string(), format!("{:?}", value)));
+            .push((field.name(), Cow::Owned(format!("{:?}", value))));
     }
 }
 
@@ -289,10 +299,12 @@ struct FieldFormatter<'a> {
 }
 
 impl<'a> FieldFormatter<'a> {
+    #[inline]
     fn new(level: &'a Level, is_success: bool) -> Self {
         Self { level, is_success }
     }
 
+    #[inline]
     fn get_value_style(level: &Level) -> Style {
         match *level {
             Level::ERROR => ERROR_VALUE_STYLE,
@@ -303,13 +315,17 @@ impl<'a> FieldFormatter<'a> {
         }
     }
 
-    fn write_fields(&self, writer: &mut Writer<'_>, fields: &[(String, String)]) -> fmt::Result {
-        let non_message_fields: SmallVec<[&(String, String); 4]> = fields
+    fn write_fields(
+        &self,
+        writer: &mut Writer<'_>,
+        fields: &[(&'static str, Cow<'static, str>)],
+    ) -> fmt::Result {
+        let non_message_fields: SmallVec<[&(&'static str, Cow<'static, str>); 4]> = fields
             .iter()
-            .filter(|(name, _)| name != "message" && name != "success" && name != "cause")
+            .filter(|(name, _)| *name != "message" && *name != "success" && *name != "cause")
             .collect();
 
-        if let Some((_, message)) = fields.iter().find(|(name, _)| name == "message") {
+        if let Some((_, message)) = fields.iter().find(|(name, _)| *name == "message") {
             write!(writer, "{}", message)?;
         }
 

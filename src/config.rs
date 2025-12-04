@@ -1,11 +1,13 @@
+use crate::async_writer::{AsyncMakeWriter, AsyncWriterConfig, WriterGuard};
 use crate::error::ConfigError;
 use crate::formatter::ConsoleFormatter;
 
+use std::sync::Arc;
 use tracing_subscriber::{
-    EnvFilter,
     fmt::{self, format::FmtSpan},
     layer::SubscriberExt,
     util::SubscriberInitExt,
+    EnvFilter,
 };
 
 #[derive(Debug, Clone)]
@@ -15,6 +17,7 @@ pub struct LoggingConfig {
     pub enable_debug: bool,
     pub verbose_mode: bool,
     pub include_timestamps: bool,
+    pub enable_async_writer: bool,
 }
 
 impl Default for LoggingConfig {
@@ -27,6 +30,7 @@ impl Default for LoggingConfig {
             enable_debug: feature_config.debug_enabled,
             verbose_mode: false,
             include_timestamps: true,
+            enable_async_writer: true,
         }
     }
 }
@@ -48,7 +52,7 @@ impl FeatureConfig {
     }
 }
 
-pub fn init_logging(config: LoggingConfig) -> Result<(), ConfigError> {
+pub fn init_logging(config: LoggingConfig) -> Result<Option<Arc<WriterGuard>>, ConfigError> {
     let feature_config = FeatureConfig::from_features();
 
     if feature_config.logs_enabled
@@ -60,7 +64,7 @@ pub fn init_logging(config: LoggingConfig) -> Result<(), ConfigError> {
 
     if !feature_config.logs_enabled {
         tracing_subscriber::registry().init();
-        return Ok(());
+        return Ok(None);
     }
 
     let env_filter = match (
@@ -72,40 +76,85 @@ pub fn init_logging(config: LoggingConfig) -> Result<(), ConfigError> {
         (false, false) => EnvFilter::new("info"),
     };
 
-    macro_rules! console_layer {
-        () => {
-            fmt::layer()
-                .event_format(ConsoleFormatter::new().with_timestamps(config.include_timestamps))
+    let guard = if config.enable_async_writer {
+        let async_config = AsyncWriterConfig {
+            buffer_capacity: 8192,
+            flush_interval_ms: 100,
+            channel_capacity: 10000,
         };
-    }
+        let (async_writer, guard) = AsyncMakeWriter::with_config(async_config);
 
-    macro_rules! json_layer {
-        () => {
-            fmt::layer()
-                .json()
-                .with_target(true)
-                .with_thread_ids(true)
-                .with_span_events(FmtSpan::CLOSE)
+        macro_rules! console_layer {
+            () => {
+                fmt::layer().with_writer(async_writer.clone()).event_format(
+                    ConsoleFormatter::new().with_timestamps(config.include_timestamps),
+                )
+            };
+        }
+
+        macro_rules! json_layer {
+            () => {
+                fmt::layer()
+                    .with_writer(async_writer.clone())
+                    .json()
+                    .with_target(true)
+                    .with_thread_ids(true)
+                    .with_span_events(FmtSpan::CLOSE)
+            };
+        }
+
+        let subscriber = tracing_subscriber::registry().with(env_filter);
+
+        let result = match (config.enable_console, config.enable_json) {
+            (true, true) => subscriber
+                .with(console_layer!())
+                .with(json_layer!())
+                .try_init(),
+            (true, false) => subscriber.with(console_layer!()).try_init(),
+            (false, true) => subscriber.with(json_layer!()).try_init(),
+            (false, false) => subscriber.try_init(),
         };
-    }
 
-    let subscriber = tracing_subscriber::registry().with(env_filter);
+        result.map_err(|_| ConfigError::LoggingInitFailed)?;
+        Some(guard)
+    } else {
+        macro_rules! console_layer {
+            () => {
+                fmt::layer().event_format(
+                    ConsoleFormatter::new().with_timestamps(config.include_timestamps),
+                )
+            };
+        }
 
-    let result = match (config.enable_console, config.enable_json) {
-        (true, true) => subscriber
-            .with(console_layer!())
-            .with(json_layer!())
-            .try_init(),
-        (true, false) => subscriber.with(console_layer!()).try_init(),
-        (false, true) => subscriber.with(json_layer!()).try_init(),
-        (false, false) => subscriber.try_init(),
+        macro_rules! json_layer {
+            () => {
+                fmt::layer()
+                    .json()
+                    .with_target(true)
+                    .with_thread_ids(true)
+                    .with_span_events(FmtSpan::CLOSE)
+            };
+        }
+
+        let subscriber = tracing_subscriber::registry().with(env_filter);
+
+        let result = match (config.enable_console, config.enable_json) {
+            (true, true) => subscriber
+                .with(console_layer!())
+                .with(json_layer!())
+                .try_init(),
+            (true, false) => subscriber.with(console_layer!()).try_init(),
+            (false, true) => subscriber.with(json_layer!()).try_init(),
+            (false, false) => subscriber.try_init(),
+        };
+
+        result.map_err(|_| ConfigError::LoggingInitFailed)?;
+        None
     };
 
-    result.map_err(|_| ConfigError::LoggingInitFailed)?;
-
-    Ok(())
+    Ok(guard)
 }
 
-pub fn init_logging_default() -> Result<(), ConfigError> {
+pub fn init_logging_default() -> Result<Option<Arc<WriterGuard>>, ConfigError> {
     init_logging(LoggingConfig::default())
 }

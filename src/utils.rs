@@ -1,17 +1,26 @@
 use eyre::Result;
 use lazy_regex::regex;
 use std::future::Future;
-use tracing::{Level, error};
+use tracing::{error, Level};
 
+#[inline]
 pub fn contains_url(value: &str) -> bool {
+    if !value.contains("://") {
+        return false;
+    }
     regex!(r"https?://[^\s]+|ftp://[^\s]+").is_match(value)
 }
 
+#[inline]
 pub fn format_urls<F1, F2>(content: &str, format_text: F1, format_url: F2) -> String
 where
     F1: Fn(&str) -> String,
     F2: Fn(&str) -> String,
 {
+    if !content.contains("://") {
+        return format_text(content);
+    }
+
     let url_regex = regex!(r"https?://[^\s]+|ftp://[^\s]+");
 
     if !url_regex.is_match(content) {
