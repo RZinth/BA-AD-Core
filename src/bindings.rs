@@ -15,8 +15,12 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::OnceLock;
+use tracing_appender::non_blocking::WorkerGuard;
 
 pub use crate::error::{ConfigError, FileError};
+
+static LOGGER_GUARD: OnceLock<WorkerGuard> = OnceLock::new();
 
 #[derive(Debug, Clone)]
 pub struct LoggingConfig {
@@ -59,11 +63,19 @@ impl From<crate::config::FeatureConfig> for FeatureConfig {
 }
 
 pub fn init_logging(config: LoggingConfig) -> Result<(), ConfigError> {
-    crate::config::init_logging(config.into()).map(|_| ())
+    let guard = crate::config::init_logging(config.into())?;
+    if let Some(g) = guard {
+        let _ = LOGGER_GUARD.set(g);
+    }
+    Ok(())
 }
 
 pub fn init_logging_default() -> Result<(), ConfigError> {
-    crate::config::init_logging_default().map(|_| ())
+    let guard = crate::config::init_logging_default()?;
+    if let Some(g) = guard {
+        let _ = LOGGER_GUARD.set(g);
+    }
+    Ok(())
 }
 
 pub fn get_feature_config() -> FeatureConfig {
