@@ -1,8 +1,8 @@
-use crate::async_writer::{AsyncMakeWriter, AsyncWriterConfig, WriterGuard};
+use crate::async_writer::AsyncMakeWriter;
 use crate::error::ConfigError;
 use crate::formatter::ConsoleFormatter;
 
-use std::sync::Arc;
+use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
     fmt::{self, format::FmtSpan},
     layer::SubscriberExt,
@@ -52,7 +52,7 @@ impl FeatureConfig {
     }
 }
 
-pub fn init_logging(config: LoggingConfig) -> Result<Option<Arc<WriterGuard>>, ConfigError> {
+pub fn init_logging(config: LoggingConfig) -> Result<Option<WorkerGuard>, ConfigError> {
     let feature_config = FeatureConfig::from_features();
 
     if feature_config.logs_enabled
@@ -77,12 +77,7 @@ pub fn init_logging(config: LoggingConfig) -> Result<Option<Arc<WriterGuard>>, C
     };
 
     let guard = if config.enable_async_writer {
-        let async_config = AsyncWriterConfig {
-            buffer_capacity: 8192,
-            flush_interval_ms: 100,
-            channel_capacity: 10000,
-        };
-        let (async_writer, guard) = AsyncMakeWriter::with_config(async_config);
+        let (async_writer, guard) = AsyncMakeWriter::new();
 
         macro_rules! console_layer {
             () => {
@@ -155,6 +150,6 @@ pub fn init_logging(config: LoggingConfig) -> Result<Option<Arc<WriterGuard>>, C
     Ok(guard)
 }
 
-pub fn init_logging_default() -> Result<Option<Arc<WriterGuard>>, ConfigError> {
+pub fn init_logging_default() -> Result<Option<WorkerGuard>, ConfigError> {
     init_logging(LoggingConfig::default())
 }

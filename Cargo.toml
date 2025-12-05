@@ -1,6 +1,6 @@
 [package]
 name = "baad-core"
-version = "2.7.0"
+version = "2.7.1"
 edition = "2024"
 
 [[bin]]
@@ -36,6 +36,7 @@ tokio = { version = "1.47.0", features = ["full"] }
 platform-dirs = "0.3.0"
 anyhow = "1.0.99"
 uniffi = { version = "0.29.5", features = ["cli"], optional = true }
+tracing-appender = { version = "0.2.4", features = ["parking_lot"] }
 
 [build-dependencies]
 uniffi = { version = "0.29.5", features = [ "build" ], optional = true }
