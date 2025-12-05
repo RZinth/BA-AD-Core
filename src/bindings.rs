@@ -135,61 +135,66 @@ pub fn log_recoverable_error_from_string(error_message: &str, recovery_action: &
 }
 
 pub fn log_info(message: &str) {
-    tracing::info!("{}", message);
+    tracing::info!(message);
 }
 
 pub fn log_error(message: &str) {
-    tracing::error!("{}", message);
+    tracing::error!(message);
 }
 
 pub fn log_warn(message: &str) {
-    tracing::warn!("{}", message);
+    tracing::warn!(message);
 }
 
 pub fn log_debug(message: &str) {
-    tracing::debug!("{}", message);
+    tracing::debug!(message);
 }
 
 pub fn log_trace(message: &str) {
-    tracing::trace!("{}", message);
+    tracing::trace!(message);
 }
 
-pub fn log_info_with_field(message: &str, field_name: &str, field_value: &str) {
-    tracing::info!("{}: {}={}", message, field_name, field_value);
+pub fn log_info_with_field(message: &str, value: &str, name: &Option<String>) {
+    let field_name = name.as_deref().unwrap_or("name");
+    tracing::info!(%field_name, value, message);
 }
 
-pub fn log_error_with_field(message: &str, field_name: &str, field_value: &str) {
-    tracing::error!("{}: {}={}", message, field_name, field_value);
+pub fn log_error_with_field(message: &str, value: &str, name: &Option<String>) {
+    let field_name = name.as_deref().unwrap_or("name");
+    tracing::error!(%field_name, value, message);
 }
 
-pub fn log_warn_with_field(message: &str, field_name: &str, field_value: &str) {
-    tracing::warn!("{}: {}={}", message, field_name, field_value);
+pub fn log_warn_with_field(message: &str, value: &str, name: &Option<String>) {
+    let field_name = name.as_deref().unwrap_or("name");
+    tracing::warn!(%field_name, value, message);
 }
 
-pub fn log_debug_with_field(message: &str, field_name: &str, field_value: &str) {
-    tracing::debug!("{}: {}={}", message, field_name, field_value);
+pub fn log_debug_with_field(message: &str, value: &str, name: &Option<String>) {
+    let field_name = name.as_deref().unwrap_or("name");
+    tracing::debug!(%field_name, value, message);
 }
 
-pub fn log_trace_with_field(message: &str, field_name: &str, field_value: &str) {
-    tracing::trace!("{}: {}={}", message, field_name, field_value);
+pub fn log_trace_with_field(message: &str, value: &str, name: &Option<String>) {
+    let field_name = name.as_deref().unwrap_or("name");
+    tracing::trace!(%field_name, value, message);
 }
 
 pub fn log_info_with_fields(message: &str, fields: HashMap<String, String>) {
-    tracing::info!(message = %message, ?fields);
+    tracing::info!(fields = ?fields, message);
 }
 
 pub fn log_error_with_fields(message: &str, fields: HashMap<String, String>) {
-    tracing::error!(message = %message, ?fields);
+    tracing::error!(fields = ?fields, message);
 }
 
 pub fn log_warn_with_fields(message: &str, fields: HashMap<String, String>) {
-    tracing::warn!(message = %message, ?fields);
+    tracing::warn!(fields = ?fields, message);
 }
 
 pub fn log_debug_with_fields(message: &str, fields: HashMap<String, String>) {
-    tracing::debug!(message = %message, ?fields);
+    tracing::debug!(fields = ?fields, message);
 }
 
 pub fn log_trace_with_fields(message: &str, fields: HashMap<String, String>) {
-    tracing::trace!(message = %message, ?fields);
+    tracing::trace!(fields = ?fields, message);
 }
