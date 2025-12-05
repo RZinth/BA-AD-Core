@@ -138,6 +138,10 @@ pub fn log_info(message: &str) {
     tracing::info!(message);
 }
 
+pub fn log_success(message: &str) {
+    tracing::trace!(success = true, message);
+}
+
 pub fn log_error(message: &str) {
     tracing::error!(message);
 }
@@ -154,33 +158,36 @@ pub fn log_trace(message: &str) {
     tracing::trace!(message);
 }
 
-pub fn log_info_with_field(message: &str, value: &str, name: &Option<String>) {
-    let field_name = name.as_deref().unwrap_or("name");
-    tracing::info!(%field_name, value, message);
+pub fn log_info_with_field(message: &str, value: &str) {
+    tracing::info!(value, message);
 }
 
-pub fn log_error_with_field(message: &str, value: &str, name: &Option<String>) {
-    let field_name = name.as_deref().unwrap_or("name");
-    tracing::error!(%field_name, value, message);
+pub fn log_success_with_field(message: &str, value: &str) {
+    tracing::trace!(success = true, value, message);
 }
 
-pub fn log_warn_with_field(message: &str, value: &str, name: &Option<String>) {
-    let field_name = name.as_deref().unwrap_or("name");
-    tracing::warn!(%field_name, value, message);
+pub fn log_error_with_field(message: &str, value: &str) {
+    tracing::error!(value, message);
 }
 
-pub fn log_debug_with_field(message: &str, value: &str, name: &Option<String>) {
-    let field_name = name.as_deref().unwrap_or("name");
-    tracing::debug!(%field_name, value, message);
+pub fn log_warn_with_field(message: &str, value: &str) {
+    tracing::warn!(value, message);
 }
 
-pub fn log_trace_with_field(message: &str, value: &str, name: &Option<String>) {
-    let field_name = name.as_deref().unwrap_or("name");
-    tracing::trace!(%field_name, value, message);
+pub fn log_debug_with_field(message: &str, value: &str) {
+    tracing::debug!(value, message);
+}
+
+pub fn log_trace_with_field(message: &str, value: &str) {
+    tracing::trace!(value, message);
 }
 
 pub fn log_info_with_fields(message: &str, fields: HashMap<String, String>) {
     tracing::info!(fields = ?fields, message);
+}
+
+pub fn log_success_with_fields(message: &str, fields: HashMap<String, String>) {
+    tracing::info!(success = true, fields = ?fields, message);
 }
 
 pub fn log_error_with_fields(message: &str, fields: HashMap<String, String>) {
