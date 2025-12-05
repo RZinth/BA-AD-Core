@@ -139,7 +139,7 @@ pub fn log_info(message: &str) {
 }
 
 pub fn log_success(message: &str) {
-    tracing::trace!(success = true, message);
+    tracing::info!(success = true, message);
 }
 
 pub fn log_error(message: &str) {
@@ -163,7 +163,7 @@ pub fn log_info_with_field(message: &str, value: &str) {
 }
 
 pub fn log_success_with_field(message: &str, value: &str) {
-    tracing::trace!(success = true, value, message);
+    tracing::info!(success = true, value, message);
 }
 
 pub fn log_error_with_field(message: &str, value: &str) {
