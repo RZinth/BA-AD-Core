@@ -1,2 +1,2 @@
 > [!WARNING] 
-> Deprecated, use [baad-shared](https://github.com/Deathemonic/BA-AD/tree/crates/baad-shared)
+> Deprecated, use [baad-utils](https://github.com/Deathemonic/BA-AD/tree/main/crates/baad-utils)
